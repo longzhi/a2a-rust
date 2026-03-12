@@ -93,7 +93,9 @@ src/
 - `src/error.rs` - `A2AError` and protocol/HTTP error mapping
 - `src/jsonrpc.rs` - JSON-RPC 2.0 envelopes, method constants, error-code constants
 - `src/store.rs` - `TaskStore` and `InMemoryTaskStore`
+- `src/types/agent_id.rs` - validated helper type for agent naming conventions
 - `src/types/agent_card.rs` - Agent card and capability model
+- `src/types/auth.rs` - `TASK_STATE_AUTH_REQUIRED` metadata helpers
 - `src/types/message.rs` - `Message`, `Part`, `Artifact`, `Role`
 - `src/types/task.rs` - `Task`, `TaskStatus`, `TaskState`
 - `src/types/security.rs` - security schemes and OAuth flow types
@@ -108,7 +110,7 @@ src/
 ```toml
 [features]
 default = ["server", "client"]
-server = ["dep:async-trait", "dep:axum", "dep:futures-core", "dep:futures-util"]
+server = ["dep:async-trait", "dep:axum", "dep:futures-core", "dep:futures-util", "dep:tokio"]
 client = ["dep:futures-core", "dep:futures-util", "dep:reqwest"]
 ```
 
@@ -158,7 +160,27 @@ Important:
 
 - the field is `location`, not OpenAPI's `in`
 - `OAuthFlows` is modeled as a oneof-style enum
+- deserialization also accepts the Python SDK `type`-discriminator shape for interop
 - deprecated OAuth flows still exist in the tagged proto and remain part of the wire model
+
+### AgentId
+
+The crate exposes an `AgentId` helper for repository-level naming rules:
+
+- lowercase ASCII letters, digits, and `-` only
+- length 3-64 characters
+
+This helper is not a proto field.
+
+### AUTH_REQUIRED convention
+
+The crate exposes `AuthRequiredMetadata` plus helper methods on `Message`, `TaskStatus`, and `Task`
+for the repository's `TASK_STATE_AUTH_REQUIRED` metadata convention:
+
+- `authUrl`
+- `authScheme`
+- `scopes`
+- `description`
 
 ### Required shape corrections already reflected in code
 

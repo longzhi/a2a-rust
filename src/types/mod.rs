@@ -5,6 +5,10 @@ use serde::{Deserialize, Deserializer, Serializer};
 
 /// Agent discovery and capability types.
 pub mod agent_card;
+/// Validated helper type for application-level agent identifiers.
+pub mod agent_id;
+/// Auth-required metadata helpers and conventions.
+pub mod auth;
 /// Messages, parts, and artifacts exchanged by agents.
 pub mod message;
 /// Push-notification configuration types.
@@ -19,6 +23,8 @@ pub mod security;
 pub mod task;
 
 pub use self::agent_card::*;
+pub use self::agent_id::*;
+pub use self::auth::*;
 pub use self::message::*;
 pub use self::push::*;
 pub use self::requests::*;
