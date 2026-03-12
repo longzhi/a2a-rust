@@ -20,6 +20,12 @@ Be respectful, inclusive, and constructive. We're all here to build a great A2A 
 - Rust 1.75+ (install via [rustup](https://rustup.rs/))
 - Git
 
+Install local git hooks after cloning:
+
+```bash
+just install-hooks
+```
+
 ### Build & Test
 
 ```bash
@@ -97,6 +103,8 @@ fix(server): handle missing Content-Type in JSON-RPC requests
 test(serde): add round-trip tests for SecurityScheme variants
 docs(readme): add SSE streaming example
 ```
+
+Local hooks enforce this commit message format and run checks on `git commit` and `git push`.
 
 ## Pull Request Process
 
