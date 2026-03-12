@@ -8,8 +8,8 @@ This file provides guidance to AI coding agents working in this repository.
 
 Current implementation status:
 
-- implemented now: transport-neutral core types, JSON-RPC envelopes/constants, and `A2AError`
-- planned next: `server`, `client`, and `store` layers
+- implemented now: `types`, `error`, `jsonrpc`, `server`, `client`, and `store`
+- remaining work: docs, examples, and release polish
 
 This crate has zero Clawhive-specific logic. Keep it generic and protocol-focused.
 
@@ -82,45 +82,37 @@ src/
 ├── lib.rs
 ├── error.rs
 ├── jsonrpc.rs
-└── types/
-    ├── mod.rs
-    ├── agent_card.rs
-    ├── message.rs
-    ├── push.rs
-    ├── requests.rs
-    ├── responses.rs
-    ├── security.rs
-    └── task.rs
+├── store.rs
+├── types/
+├── server/
+└── client/
 ```
-
-Planned but not implemented yet:
-
-- `src/server/*`
-- `src/client/*`
-- `src/store.rs`
 
 ## Key Source Files
 
 - `src/error.rs` - `A2AError` and protocol/HTTP error mapping
 - `src/jsonrpc.rs` - JSON-RPC 2.0 envelopes, method constants, error-code constants
+- `src/store.rs` - `TaskStore` and `InMemoryTaskStore`
 - `src/types/agent_card.rs` - Agent card and capability model
 - `src/types/message.rs` - `Message`, `Part`, `Artifact`, `Role`
 - `src/types/task.rs` - `Task`, `TaskStatus`, `TaskState`
 - `src/types/security.rs` - security schemes and OAuth flow types
 - `src/types/requests.rs` - protocol request types
 - `src/types/responses.rs` - protocol response and stream-event types
-- `docs/proto-first-design.md` - implementation contract for future phases
+- `src/server/*` - REST, JSON-RPC, SSE, and handler traits
+- `src/client/*` - discovery, dual transport client, and SSE parsing
+- `docs/proto-first-design.md` - implementation contract
 
 ## Feature Flags
 
 ```toml
 [features]
 default = ["server", "client"]
-server = ["dep:axum"]
-client = ["dep:reqwest"]
+server = ["dep:async-trait", "dep:axum", "dep:futures-core", "dep:futures-util"]
+client = ["dep:futures-core", "dep:futures-util", "dep:reqwest"]
 ```
 
-At the moment, the feature flags reserve dependency boundaries for the planned transport layers. The current public API is the core crate surface in `lib.rs`.
+`default-features = false` must keep the types-only surface working.
 
 ## Protocol and Serialization Rules
 
@@ -195,15 +187,18 @@ Do not invent new A2A error codes.
 
 ## Testing Guidance
 
-The most important tests right now are serde and wire-shape tests.
+The repo now has three test layers:
+
+- inline unit and serde tests in `src/*`
+- `tests/server_integration.rs` for axum router coverage
+- `tests/client_integration.rs` and `tests/client_wiremock.rs` for client behavior
 
 Prefer:
 
-- inline `#[cfg(test)]` modules at the bottom of each file
 - canonical spec/proto JSON examples
 - explicit invalid-shape tests for `Part`, `SendMessageResponse`, and `StreamResponse`
-
-The current test suite is still narrow. Expanding canonical serde coverage is high-value work.
+- `wiremock` for client-only transport and envelope behavior
+- local axum server tests for end-to-end server/client behavior
 
 ## References
 

@@ -1,12 +1,21 @@
+//! Core A2A protocol types.
+
 use base64::Engine as _;
 use serde::{Deserialize, Deserializer, Serializer};
 
+/// Agent discovery and capability types.
 pub mod agent_card;
+/// Messages, parts, and artifacts exchanged by agents.
 pub mod message;
+/// Push-notification configuration types.
 pub mod push;
+/// Operation request payloads.
 pub mod requests;
+/// Operation response payloads and stream events.
 pub mod responses;
+/// Security scheme and requirement types.
 pub mod security;
+/// Task state and status models.
 pub mod task;
 
 pub use self::agent_card::*;
@@ -17,6 +26,7 @@ pub use self::responses::*;
 pub use self::security::*;
 pub use self::task::*;
 
+/// Shared JSON object alias used across metadata-bearing protocol types.
 pub type JsonObject = serde_json::Map<String, serde_json::Value>;
 
 pub(crate) fn is_false(value: &bool) -> bool {

@@ -34,8 +34,10 @@ use super::discovery::{
     resolve_interface_url,
 };
 
+/// Configuration for [`A2AClient`].
 #[derive(Debug, Clone)]
 pub struct A2AClientConfig {
+    /// Discovery cache time-to-live.
     pub discovery_ttl: Duration,
     /// Extension URIs sent as `A2A-Extensions: uri1,uri2`.
     pub extensions: Vec<String>,
@@ -56,9 +58,11 @@ enum TransportEndpoint {
     HttpJson(Url),
 }
 
+/// Stream of validated SSE items returned by streaming client operations.
 pub type A2AClientStream =
     Pin<Box<dyn Stream<Item = Result<StreamResponse, A2AError>> + Send + 'static>>;
 
+/// HTTP client for discovery, unary calls, and SSE streams against a remote agent.
 #[derive(Debug)]
 pub struct A2AClient {
     base_url: Url,
@@ -69,14 +73,17 @@ pub struct A2AClient {
 }
 
 impl A2AClient {
+    /// Create a client with default configuration and a default `reqwest` client.
     pub fn new(base_url: &str) -> Result<Self, A2AError> {
         Self::with_config(base_url, A2AClientConfig::default())
     }
 
+    /// Create a client with explicit SDK configuration.
     pub fn with_config(base_url: &str, config: A2AClientConfig) -> Result<Self, A2AError> {
         Self::with_http_client(base_url, reqwest::Client::new(), config)
     }
 
+    /// Create a client with an explicit `reqwest` client and SDK configuration.
     pub fn with_http_client(
         base_url: &str,
         client: reqwest::Client,
@@ -99,14 +106,17 @@ impl A2AClient {
         })
     }
 
+    /// Discover the remote agent card, using the discovery cache when fresh.
     pub async fn discover_agent_card(&self) -> Result<AgentCard, A2AError> {
         self.discovery.discover(self.base_url.as_ref()).await
     }
 
+    /// Refresh the remote agent card and replace any cached copy.
     pub async fn refresh_agent_card(&self) -> Result<AgentCard, A2AError> {
         self.discovery.refresh(self.base_url.as_ref()).await
     }
 
+    /// Invoke `SendMessage` over the server's preferred unary transport.
     pub async fn send_message(
         &self,
         request: SendMessageRequest,
@@ -134,6 +144,7 @@ impl A2AClient {
         Ok(response)
     }
 
+    /// Invoke `SendStreamingMessage` over HTTP+JSON SSE.
     pub async fn send_streaming_message(
         &self,
         request: SendMessageRequest,
@@ -155,6 +166,7 @@ impl A2AClient {
         self.read_sse_response(response).await
     }
 
+    /// Fetch a task by identifier.
     pub async fn get_task(&self, request: GetTaskRequest) -> Result<Task, A2AError> {
         match self.transport().await? {
             TransportEndpoint::JsonRpc(url) => {
@@ -179,6 +191,7 @@ impl A2AClient {
         }
     }
 
+    /// List tasks using the server's preferred unary transport.
     pub async fn list_tasks(
         &self,
         request: ListTasksRequest,
@@ -210,6 +223,7 @@ impl A2AClient {
         }
     }
 
+    /// Request cancellation of a task.
     pub async fn cancel_task(&self, request: CancelTaskRequest) -> Result<Task, A2AError> {
         match self.transport().await? {
             TransportEndpoint::JsonRpc(url) => {
@@ -232,6 +246,7 @@ impl A2AClient {
         }
     }
 
+    /// Fetch the extended agent card when the remote agent advertises it.
     pub async fn get_extended_agent_card(
         &self,
         request: GetExtendedAgentCardRequest,
@@ -253,6 +268,7 @@ impl A2AClient {
         }
     }
 
+    /// Create or replace a push-notification configuration for a task.
     pub async fn create_task_push_notification_config(
         &self,
         request: CreateTaskPushNotificationConfigRequest,
@@ -282,6 +298,7 @@ impl A2AClient {
         }
     }
 
+    /// Fetch a single push-notification configuration by identifier.
     pub async fn get_task_push_notification_config(
         &self,
         request: GetTaskPushNotificationConfigRequest,
@@ -312,6 +329,7 @@ impl A2AClient {
         }
     }
 
+    /// List push-notification configurations for a task.
     pub async fn list_task_push_notification_config(
         &self,
         request: ListTaskPushNotificationConfigRequest,
@@ -343,6 +361,7 @@ impl A2AClient {
         }
     }
 
+    /// Delete a push-notification configuration by identifier.
     pub async fn delete_task_push_notification_config(
         &self,
         request: DeleteTaskPushNotificationConfigRequest,
@@ -378,6 +397,7 @@ impl A2AClient {
         }
     }
 
+    /// Subscribe to task updates over HTTP+JSON SSE.
     pub async fn subscribe_to_task(
         &self,
         request: SubscribeToTaskRequest,

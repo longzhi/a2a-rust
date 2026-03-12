@@ -8,8 +8,10 @@ use crate::A2AError;
 use crate::jsonrpc::PROTOCOL_VERSION;
 use crate::types::AgentCard;
 
+/// Discovery cache configuration for remote agent cards.
 #[derive(Debug, Clone, Copy)]
 pub struct AgentCardDiscoveryConfig {
+    /// Maximum time to reuse a cached discovery response.
     pub ttl: Duration,
 }
 
@@ -27,6 +29,7 @@ struct CachedAgentCard {
     fetched_at: Instant,
 }
 
+/// Discovers and caches remote A2A agent cards.
 #[derive(Debug)]
 pub struct AgentCardDiscovery {
     client: reqwest::Client,
@@ -41,14 +44,17 @@ impl Default for AgentCardDiscovery {
 }
 
 impl AgentCardDiscovery {
+    /// Create a discovery client with default caching behavior.
     pub fn new() -> Self {
         Self::with_config(AgentCardDiscoveryConfig::default())
     }
 
+    /// Create a discovery client with explicit cache settings.
     pub fn with_config(config: AgentCardDiscoveryConfig) -> Self {
         Self::with_http_client(reqwest::Client::new(), config)
     }
 
+    /// Create a discovery client with a caller-provided HTTP client.
     pub fn with_http_client(client: reqwest::Client, config: AgentCardDiscoveryConfig) -> Self {
         Self {
             client,
@@ -57,6 +63,7 @@ impl AgentCardDiscovery {
         }
     }
 
+    /// Discover an agent card, using the cache when still fresh.
     pub async fn discover(&self, base_url: &str) -> Result<AgentCard, A2AError> {
         let base_url = normalize_base_url(base_url)?;
         let cache_key = cache_key(&base_url);
@@ -68,6 +75,7 @@ impl AgentCardDiscovery {
         self.fetch_and_store(cache_key, base_url).await
     }
 
+    /// Force a fresh agent-card fetch and replace any cached entry.
     pub async fn refresh(&self, base_url: &str) -> Result<AgentCard, A2AError> {
         let base_url = normalize_base_url(base_url)?;
         self.fetch_and_store(cache_key(&base_url), base_url).await

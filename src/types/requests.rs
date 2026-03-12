@@ -7,69 +7,94 @@ use super::message::Message;
 use super::push::PushNotificationConfig;
 use super::task::TaskState;
 
+/// Optional configuration for `SendMessage`.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SendMessageConfiguration {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    /// Output modes the caller can accept.
     pub accepted_output_modes: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Optional push configuration to attach to the request.
     pub push_notification_config: Option<PushNotificationConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Maximum history items requested in task responses.
     pub history_length: Option<i32>,
     #[serde(default, skip_serializing_if = "crate::types::is_false")]
+    /// Whether the server should block for a final response when possible.
     pub blocking: bool,
 }
 
+/// Request payload for `SendMessage`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SendMessageRequest {
+    /// Input message from the caller.
     pub message: Message,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Optional message handling configuration.
     pub configuration: Option<SendMessageConfiguration>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Optional request metadata.
     pub metadata: Option<JsonObject>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Optional tenant identifier.
     pub tenant: Option<String>,
 }
 
 impl SendMessageRequest {
+    /// Validate nested message content.
     pub fn validate(&self) -> Result<(), A2AError> {
         self.message.validate()
     }
 }
 
+/// Request payload for `GetTask`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GetTaskRequest {
+    /// Task identifier.
     pub id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Maximum history items requested in the response.
     pub history_length: Option<i32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Optional tenant identifier.
     pub tenant: Option<String>,
 }
 
+/// Request payload for `ListTasks`.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ListTasksRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Optional tenant identifier.
     pub tenant: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Optional context filter.
     pub context_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Optional task-state filter.
     pub status: Option<TaskState>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Requested page size.
     pub page_size: Option<i32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Opaque pagination token from a previous response.
     pub page_token: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Maximum history items requested per returned task.
     pub history_length: Option<i32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Lower bound for task status timestamps.
     pub status_timestamp_after: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Whether artifacts should be included in results.
     pub include_artifacts: Option<bool>,
 }
 
 impl ListTasksRequest {
+    /// Validate pagination bounds.
     pub fn validate(&self) -> Result<(), A2AError> {
         if let Some(page_size) = self.page_size
             && !(1..=100).contains(&page_size)
@@ -83,63 +108,88 @@ impl ListTasksRequest {
     }
 }
 
+/// Request payload for `CancelTask`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CancelTaskRequest {
+    /// Task identifier.
     pub id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Optional tenant identifier.
     pub tenant: Option<String>,
 }
 
+/// Request payload for `GetTaskPushNotificationConfig`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GetTaskPushNotificationConfigRequest {
+    /// Push configuration identifier.
     pub id: String,
+    /// Owning task identifier.
     pub task_id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Optional tenant identifier.
     pub tenant: Option<String>,
 }
 
+/// Request payload for `DeleteTaskPushNotificationConfig`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DeleteTaskPushNotificationConfigRequest {
+    /// Push configuration identifier.
     pub id: String,
+    /// Owning task identifier.
     pub task_id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Optional tenant identifier.
     pub tenant: Option<String>,
 }
 
+/// Request payload for `CreateTaskPushNotificationConfig`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateTaskPushNotificationConfigRequest {
+    /// Owning task identifier.
     pub task_id: String,
+    /// Desired push configuration identifier.
     pub config_id: String,
+    /// Push delivery configuration.
     pub config: PushNotificationConfig,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Optional tenant identifier.
     pub tenant: Option<String>,
 }
 
+/// Request payload for `SubscribeToTask`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SubscribeToTaskRequest {
+    /// Task identifier.
     pub id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Optional tenant identifier.
     pub tenant: Option<String>,
 }
 
+/// Request payload for `ListTaskPushNotificationConfig`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ListTaskPushNotificationConfigRequest {
+    /// Owning task identifier.
     pub task_id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Requested page size.
     pub page_size: Option<i32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Opaque pagination token from a previous response.
     pub page_token: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Optional tenant identifier.
     pub tenant: Option<String>,
 }
 
 impl ListTaskPushNotificationConfigRequest {
+    /// Validate required identifiers.
     pub fn validate(&self) -> Result<(), A2AError> {
         if self.task_id.is_empty() {
             return Err(A2AError::InvalidRequest(
@@ -251,9 +301,11 @@ mod tests {
     }
 }
 
+/// Request payload for `GetExtendedAgentCard`.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GetExtendedAgentCardRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Optional tenant identifier.
     pub tenant: Option<String>,
 }

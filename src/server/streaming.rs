@@ -14,7 +14,7 @@ use super::handler::A2AHandler;
 
 const SSE_KEEP_ALIVE_INTERVAL: Duration = Duration::from_secs(15);
 
-pub async fn send_message<H>(
+pub(super) async fn send_message<H>(
     State(handler): State<Arc<H>>,
     Json(request): Json<SendMessageRequest>,
 ) -> Result<
@@ -29,7 +29,7 @@ where
     Ok(sse_response(stream))
 }
 
-pub async fn tenant_send_message<H>(
+pub(super) async fn tenant_send_message<H>(
     State(handler): State<Arc<H>>,
     Path(tenant): Path<String>,
     Json(mut request): Json<SendMessageRequest>,

@@ -13,6 +13,7 @@ use crate::types::{
     TaskPushNotificationConfig,
 };
 
+/// Server-side stream of A2A `StreamResponse` values.
 pub type A2AStream = Pin<Box<dyn Stream<Item = StreamResponse> + Send + 'static>>;
 
 /// Core server trait for implementing an A2A agent.
@@ -22,8 +23,10 @@ pub type A2AStream = Pin<Box<dyn Stream<Item = StreamResponse> + Send + 'static>
 /// the relevant operation methods.
 #[async_trait]
 pub trait A2AHandler: Send + Sync + 'static {
+    /// Return the agent card served from discovery and capability endpoints.
     async fn get_agent_card(&self) -> Result<AgentCard, A2AError>;
 
+    /// Process a unary `SendMessage` request.
     async fn send_message(
         &self,
         request: SendMessageRequest,
@@ -45,14 +48,17 @@ pub trait A2AHandler: Send + Sync + 'static {
         ))
     }
 
+    /// Fetch a task by identifier.
     async fn get_task(&self, _request: GetTaskRequest) -> Result<Task, A2AError> {
         Err(A2AError::UnsupportedOperation("GetTask".to_owned()))
     }
 
+    /// List tasks visible to the caller.
     async fn list_tasks(&self, _request: ListTasksRequest) -> Result<ListTasksResponse, A2AError> {
         Err(A2AError::UnsupportedOperation("ListTasks".to_owned()))
     }
 
+    /// Attempt to cancel a task.
     async fn cancel_task(&self, _request: CancelTaskRequest) -> Result<Task, A2AError> {
         Err(A2AError::UnsupportedOperation("CancelTask".to_owned()))
     }
@@ -69,6 +75,7 @@ pub trait A2AHandler: Send + Sync + 'static {
         Err(A2AError::UnsupportedOperation("SubscribeToTask".to_owned()))
     }
 
+    /// Create or replace a push-notification configuration.
     async fn create_task_push_notification_config(
         &self,
         _request: CreateTaskPushNotificationConfigRequest,
@@ -80,6 +87,7 @@ pub trait A2AHandler: Send + Sync + 'static {
         ))
     }
 
+    /// Fetch a stored push-notification configuration.
     async fn get_task_push_notification_config(
         &self,
         _request: GetTaskPushNotificationConfigRequest,
@@ -91,6 +99,7 @@ pub trait A2AHandler: Send + Sync + 'static {
         ))
     }
 
+    /// List stored push-notification configurations.
     async fn list_task_push_notification_config(
         &self,
         _request: ListTaskPushNotificationConfigRequest,
@@ -102,6 +111,7 @@ pub trait A2AHandler: Send + Sync + 'static {
         ))
     }
 
+    /// Delete a stored push-notification configuration.
     async fn delete_task_push_notification_config(
         &self,
         _request: DeleteTaskPushNotificationConfigRequest,
@@ -113,6 +123,7 @@ pub trait A2AHandler: Send + Sync + 'static {
         ))
     }
 
+    /// Fetch the extended agent card.
     async fn get_extended_agent_card(
         &self,
         _request: GetExtendedAgentCardRequest,

@@ -4,50 +4,71 @@ use crate::types::JsonObject;
 
 use super::message::{Artifact, Message};
 
+/// Server-side task resource.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Task {
+    /// Unique task identifier.
     pub id: String,
+    /// Context identifier shared with related messages and updates.
     pub context_id: String,
+    /// Current task status.
     pub status: TaskStatus,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    /// Artifacts produced by the task.
     pub artifacts: Vec<Artifact>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    /// Task message history.
     pub history: Vec<Message>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Optional task metadata.
     pub metadata: Option<JsonObject>,
 }
 
+/// Snapshot of a task's current state.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TaskStatus {
+    /// Current lifecycle state.
     pub state: TaskState,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Optional status message payload.
     pub message: Option<Message>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Optional RFC 3339 timestamp for the status update.
     pub timestamp: Option<String>,
 }
 
+/// Task lifecycle state.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TaskState {
     #[default]
     #[serde(rename = "TASK_STATE_UNSPECIFIED")]
+    /// Unspecified state.
     Unspecified,
     #[serde(rename = "TASK_STATE_SUBMITTED")]
+    /// Task accepted but not yet running.
     Submitted,
     #[serde(rename = "TASK_STATE_WORKING")]
+    /// Task is currently running.
     Working,
     #[serde(rename = "TASK_STATE_COMPLETED")]
+    /// Task completed successfully.
     Completed,
     #[serde(rename = "TASK_STATE_FAILED")]
+    /// Task failed permanently.
     Failed,
     #[serde(rename = "TASK_STATE_CANCELED")]
+    /// Task was canceled.
     Canceled,
     #[serde(rename = "TASK_STATE_INPUT_REQUIRED")]
+    /// Task requires further user input.
     InputRequired,
     #[serde(rename = "TASK_STATE_REJECTED")]
+    /// Task was rejected before execution.
     Rejected,
     #[serde(rename = "TASK_STATE_AUTH_REQUIRED")]
+    /// Task requires authentication before continuing.
     AuthRequired,
 }
 

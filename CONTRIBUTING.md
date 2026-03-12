@@ -31,11 +31,14 @@ just install-hooks
 ```bash
 cargo build
 cargo test
+cargo test --no-default-features
 cargo clippy --all-targets --all-features -- -D warnings
+cargo clippy --all-targets --no-default-features -- -D warnings
 cargo fmt --all
+cargo check --all-features --examples
 ```
 
-All four must pass before submitting a PR. CI treats all warnings as errors.
+These checks must pass before submitting a PR. CI treats all warnings as errors.
 
 ### Feature Flags
 
@@ -161,10 +164,15 @@ Use `wiremock` to mock A2A servers:
 
 ```rust
 let mock_server = MockServer::start().await;
-Mock::given(method("POST")).and(path("/jsonrpc"))
+Mock::given(method("POST")).and(path("/rpc"))
     .respond_with(ResponseTemplate::new(200).set_body_json(/* ... */))
     .mount(&mock_server).await;
 ```
+
+There are two client test styles in this repo:
+
+- `tests/client_integration.rs` for end-to-end behavior against the local axum server
+- `tests/client_wiremock.rs` for client-only transport and wire-shape tests
 
 ## Questions?
 

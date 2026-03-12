@@ -22,7 +22,7 @@ use crate::types::{
 
 use super::handler::A2AHandler;
 
-pub async fn handle<H>(
+pub(super) async fn handle<H>(
     State(handler): State<Arc<H>>,
     body: Bytes,
 ) -> (StatusCode, Json<JsonRpcResponse>)

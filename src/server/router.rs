@@ -6,6 +6,7 @@ use axum::routing::{get, post};
 use super::handler::A2AHandler;
 use super::{jsonrpc, rest, streaming};
 
+/// Build an axum router exposing the A2A REST, JSON-RPC, and discovery routes.
 pub fn router<H>(handler: H) -> Router
 where
     H: A2AHandler,

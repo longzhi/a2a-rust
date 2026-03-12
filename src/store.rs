@@ -1,26 +1,36 @@
 use std::cmp::Reverse;
 use std::collections::BTreeMap;
-use std::sync::RwLock;
 use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
+use tokio::sync::RwLock;
 
 use crate::A2AError;
 use crate::types::{ListTasksRequest, ListTasksResponse, Task};
 
+/// Persistence abstraction for task state exposed by the A2A server.
 #[async_trait]
 pub trait TaskStore: Send + Sync + 'static {
+    /// Fetch a task by its identifier.
     async fn get(&self, task_id: &str) -> Result<Option<Task>, A2AError>;
+
+    /// Insert or replace a task snapshot.
     async fn put(&self, task: &Task) -> Result<(), A2AError>;
+
     /// Implementations should reject invalid pagination inputs or delegate to
     /// `ListTasksRequest::validate()` before applying query semantics.
     async fn list(&self, req: &ListTasksRequest) -> Result<ListTasksResponse, A2AError>;
+
+    /// Delete a task by identifier.
     async fn delete(&self, task_id: &str) -> Result<bool, A2AError>;
 }
 
+/// Configuration for the in-memory task store.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct InMemoryTaskStoreConfig {
+    /// Maximum age for stored entries before they are purged on access.
     pub entry_ttl: Option<Duration>,
+    /// Maximum number of tasks retained before least-recently-used eviction.
     pub max_entries: Option<usize>,
 }
 
@@ -28,8 +38,10 @@ pub struct InMemoryTaskStoreConfig {
 struct StoredTask {
     task: Task,
     updated_at: Instant,
+    last_accessed_at: Instant,
 }
 
+/// In-process task store with TTL expiry and LRU capacity eviction.
 #[derive(Debug)]
 pub struct InMemoryTaskStore {
     config: InMemoryTaskStoreConfig,
@@ -43,10 +55,12 @@ impl Default for InMemoryTaskStore {
 }
 
 impl InMemoryTaskStore {
+    /// Create a store with default configuration.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Create a store with explicit TTL and capacity settings.
     pub fn with_config(config: InMemoryTaskStoreConfig) -> Self {
         Self {
             config,
@@ -58,27 +72,26 @@ impl InMemoryTaskStore {
 #[async_trait]
 impl TaskStore for InMemoryTaskStore {
     async fn get(&self, task_id: &str) -> Result<Option<Task>, A2AError> {
-        let mut tasks = self
-            .tasks
-            .write()
-            .map_err(|_| A2AError::Internal("task store lock poisoned".to_owned()))?;
+        let mut tasks = self.tasks.write().await;
         purge_expired(&mut tasks, self.config);
 
-        Ok(tasks.get(task_id).map(|stored| stored.task.clone()))
+        Ok(tasks.get_mut(task_id).map(|stored| {
+            stored.last_accessed_at = Instant::now();
+            stored.task.clone()
+        }))
     }
 
     async fn put(&self, task: &Task) -> Result<(), A2AError> {
-        let mut tasks = self
-            .tasks
-            .write()
-            .map_err(|_| A2AError::Internal("task store lock poisoned".to_owned()))?;
+        let mut tasks = self.tasks.write().await;
         purge_expired(&mut tasks, self.config);
 
+        let now = Instant::now();
         tasks.insert(
             task.id.clone(),
             StoredTask {
                 task: task.clone(),
-                updated_at: Instant::now(),
+                updated_at: now,
+                last_accessed_at: now,
             },
         );
         enforce_capacity(&mut tasks, self.config.max_entries);
@@ -88,15 +101,13 @@ impl TaskStore for InMemoryTaskStore {
     async fn list(&self, req: &ListTasksRequest) -> Result<ListTasksResponse, A2AError> {
         req.validate()?;
 
-        let mut tasks = self
-            .tasks
-            .write()
-            .map_err(|_| A2AError::Internal("task store lock poisoned".to_owned()))?;
+        let mut tasks = self.tasks.write().await;
         purge_expired(&mut tasks, self.config);
 
-        let mut tasks: Vec<Task> = tasks.values().map(|stored| stored.task.clone()).collect();
-        tasks.retain(|task| task_matches(task, req));
-        tasks.sort_by_key(|task| Reverse(task_sort_key(task)));
+        let mut matching_tasks: Vec<Task> =
+            tasks.values().map(|stored| stored.task.clone()).collect();
+        matching_tasks.retain(|task| task_matches(task, req));
+        matching_tasks.sort_by_key(|task| Reverse(task_sort_key(task)));
 
         // The in-memory store currently uses offset-style tokens for simplicity.
         // Downstream stores should prefer stable cursors that do not shift under writes.
@@ -108,8 +119,8 @@ impl TaskStore for InMemoryTaskStore {
             .map_err(|_| A2AError::InvalidRequest("invalid pageToken".to_owned()))?;
         let requested_page_size = req.page_size.unwrap_or(50);
         let page_size = requested_page_size.clamp(1, 100) as usize;
-        let total_size = tasks.len() as i32;
-        let page = tasks
+        let total_size = matching_tasks.len() as i32;
+        let page = matching_tasks
             .into_iter()
             .skip(start)
             .take(page_size)
@@ -121,6 +132,12 @@ impl TaskStore for InMemoryTaskStore {
                 task
             })
             .collect::<Vec<_>>();
+        let accessed_at = Instant::now();
+        for task in &page {
+            if let Some(stored) = tasks.get_mut(&task.id) {
+                stored.last_accessed_at = accessed_at;
+            }
+        }
 
         let next_start = start + page.len();
         let next_page_token = if next_start >= total_size as usize {
@@ -138,10 +155,7 @@ impl TaskStore for InMemoryTaskStore {
     }
 
     async fn delete(&self, task_id: &str) -> Result<bool, A2AError> {
-        let mut tasks = self
-            .tasks
-            .write()
-            .map_err(|_| A2AError::Internal("task store lock poisoned".to_owned()))?;
+        let mut tasks = self.tasks.write().await;
         purge_expired(&mut tasks, self.config);
 
         Ok(tasks.remove(task_id).is_some())
@@ -166,8 +180,8 @@ fn enforce_capacity(tasks: &mut BTreeMap<String, StoredTask>, max_entries: Optio
         let Some(oldest_key) = tasks
             .iter()
             .min_by(|(left_id, left), (right_id, right)| {
-                left.updated_at
-                    .cmp(&right.updated_at)
+                left.last_accessed_at
+                    .cmp(&right.last_accessed_at)
                     .then_with(|| left_id.cmp(right_id))
             })
             .map(|(task_id, _)| task_id.clone())
@@ -231,8 +245,10 @@ fn apply_history_length(task: &mut Task, history_length: Option<i32>) {
 
 #[cfg(test)]
 mod tests {
-    use std::thread;
+    use std::sync::Arc;
     use std::time::Duration;
+
+    use tokio::time::sleep;
 
     use super::{InMemoryTaskStore, InMemoryTaskStoreConfig, TaskStore};
     use crate::types::{ListTasksRequest, Task, TaskState, TaskStatus};
@@ -370,17 +386,17 @@ mod tests {
             .await
             .expect("task should store");
 
-        thread::sleep(Duration::from_millis(10));
+        sleep(Duration::from_millis(10)).await;
 
         let task = store.get("task-1").await.expect("lookup should succeed");
         assert!(task.is_none());
     }
 
     #[tokio::test]
-    async fn in_memory_task_store_evicts_oldest_when_capacity_is_exceeded() {
+    async fn in_memory_task_store_evicts_least_recently_used_when_capacity_is_exceeded() {
         let store = InMemoryTaskStore::with_config(InMemoryTaskStoreConfig {
             entry_ttl: None,
-            max_entries: Some(1),
+            max_entries: Some(2),
         });
 
         store
@@ -398,8 +414,7 @@ mod tests {
             })
             .await
             .expect("task should store");
-
-        thread::sleep(Duration::from_millis(2));
+        sleep(Duration::from_millis(2)).await;
 
         store
             .put(&Task {
@@ -416,20 +431,108 @@ mod tests {
             })
             .await
             .expect("task should store");
+        sleep(Duration::from_millis(2)).await;
 
         assert!(
             store
                 .get("task-1")
                 .await
                 .expect("lookup should succeed")
-                .is_none()
+                .is_some()
+        );
+        sleep(Duration::from_millis(2)).await;
+
+        store
+            .put(&Task {
+                id: "task-3".to_owned(),
+                context_id: "ctx-3".to_owned(),
+                status: TaskStatus {
+                    state: TaskState::Completed,
+                    message: None,
+                    timestamp: Some("2026-03-12T12:02:00Z".to_owned()),
+                },
+                artifacts: Vec::new(),
+                history: Vec::new(),
+                metadata: None,
+            })
+            .await
+            .expect("task should store");
+
+        assert!(
+            store
+                .get("task-1")
+                .await
+                .expect("lookup should succeed")
+                .is_some()
         );
         assert!(
             store
                 .get("task-2")
                 .await
                 .expect("lookup should succeed")
+                .is_none()
+        );
+        assert!(
+            store
+                .get("task-3")
+                .await
+                .expect("lookup should succeed")
                 .is_some()
         );
+    }
+
+    #[tokio::test]
+    async fn in_memory_task_store_supports_concurrent_reads_and_writes() {
+        let store = InMemoryTaskStore::with_config(InMemoryTaskStoreConfig {
+            entry_ttl: None,
+            max_entries: None,
+        });
+        let store = Arc::new(store);
+        let mut tasks = Vec::new();
+
+        for index in 0..16 {
+            let store = Arc::clone(&store);
+            tasks.push(tokio::spawn(async move {
+                let task_id = format!("task-{index}");
+                store
+                    .put(&Task {
+                        id: task_id.clone(),
+                        context_id: "ctx-1".to_owned(),
+                        status: TaskStatus {
+                            state: TaskState::Working,
+                            message: None,
+                            timestamp: Some(format!("2026-03-12T12:{index:02}:00Z")),
+                        },
+                        artifacts: Vec::new(),
+                        history: Vec::new(),
+                        metadata: None,
+                    })
+                    .await
+                    .expect("task should store");
+
+                let fetched = store.get(&task_id).await.expect("lookup should succeed");
+                assert!(fetched.is_some());
+            }));
+        }
+
+        for task in tasks {
+            task.await.expect("task should join");
+        }
+
+        let response = store
+            .list(&ListTasksRequest {
+                tenant: None,
+                context_id: Some("ctx-1".to_owned()),
+                status: None,
+                page_size: Some(100),
+                page_token: None,
+                history_length: None,
+                status_timestamp_after: None,
+                include_artifacts: Some(true),
+            })
+            .await
+            .expect("tasks should list");
+
+        assert_eq!(response.tasks.len(), 16);
     }
 }

@@ -3,41 +3,54 @@ use serde::{Deserialize, Serialize};
 use crate::A2AError;
 use crate::types::JsonObject;
 
+/// Message author role.
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
 pub enum Role {
     #[default]
     #[serde(rename = "ROLE_UNSPECIFIED")]
+    /// Unspecified role value.
     Unspecified,
     #[serde(rename = "ROLE_USER")]
+    /// End-user authored message.
     User,
     #[serde(rename = "ROLE_AGENT")]
+    /// Agent-authored message.
     Agent,
 }
 
+/// Flat content part used in messages and artifacts.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Part {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Plain-text content.
     pub text: Option<String>,
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
         with = "crate::types::base64_bytes::option"
     )]
+    /// Raw binary content encoded as base64 in JSON.
     pub raw: Option<Vec<u8>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// URL content reference.
     pub url: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Structured JSON content.
     pub data: Option<serde_json::Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Optional metadata for the part.
     pub metadata: Option<JsonObject>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Optional filename for file-like parts.
     pub filename: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Optional media type for the content.
     pub media_type: Option<String>,
 }
 
 impl Part {
+    /// Count how many mutually-exclusive content fields are populated.
     pub fn content_count(&self) -> usize {
         usize::from(self.text.is_some())
             + usize::from(self.raw.is_some())
@@ -45,10 +58,12 @@ impl Part {
             + usize::from(self.data.is_some())
     }
 
+    /// Return `true` when exactly one content field is populated.
     pub fn has_single_content(&self) -> bool {
         self.content_count() == 1
     }
 
+    /// Validate the proto oneof-style content constraint.
     pub fn validate(&self) -> Result<(), A2AError> {
         match self.content_count() {
             1 => Ok(()),
@@ -62,26 +77,36 @@ impl Part {
     }
 }
 
+/// Protocol message exchanged between user and agent.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Message {
+    /// Unique message identifier.
     pub message_id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Optional conversation context identifier.
     pub context_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Optional task identifier associated with the message.
     pub task_id: Option<String>,
+    /// Message author role.
     pub role: Role,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    /// Ordered message parts.
     pub parts: Vec<Part>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Optional message metadata.
     pub metadata: Option<JsonObject>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    /// Extension URIs attached to the message.
     pub extensions: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    /// Related task identifiers referenced by the message.
     pub reference_task_ids: Vec<String>,
 }
 
 impl Message {
+    /// Validate that the message contains at least one valid part.
     pub fn validate(&self) -> Result<(), A2AError> {
         if self.parts.is_empty() {
             return Err(A2AError::InvalidRequest(
@@ -97,23 +122,31 @@ impl Message {
     }
 }
 
+/// Output artifact produced by a task.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Artifact {
+    /// Unique artifact identifier.
     pub artifact_id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Optional artifact name.
     pub name: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Optional artifact description.
     pub description: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    /// Ordered artifact parts.
     pub parts: Vec<Part>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Optional artifact metadata.
     pub metadata: Option<JsonObject>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    /// Extension URIs attached to the artifact.
     pub extensions: Vec<String>,
 }
 
 impl Artifact {
+    /// Validate that the artifact contains at least one valid part.
     pub fn validate(&self) -> Result<(), A2AError> {
         if self.parts.is_empty() {
             return Err(A2AError::InvalidRequest(

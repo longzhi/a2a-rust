@@ -19,7 +19,7 @@ use crate::types::{
 use super::handler::A2AHandler;
 use super::streaming;
 
-pub async fn get_agent_card<H>(
+pub(super) async fn get_agent_card<H>(
     State(handler): State<Arc<H>>,
 ) -> Result<Json<AgentCard>, (StatusCode, Json<serde_json::Value>)>
 where
@@ -28,7 +28,7 @@ where
     handler.get_agent_card().await.map(Json).map_err(rest_error)
 }
 
-pub async fn send_message<H>(
+pub(super) async fn send_message<H>(
     State(handler): State<Arc<H>>,
     Json(request): Json<SendMessageRequest>,
 ) -> Result<Json<SendMessageResponse>, (StatusCode, Json<serde_json::Value>)>
@@ -48,7 +48,7 @@ where
         .map_err(rest_error)
 }
 
-pub async fn tenant_send_message<H>(
+pub(super) async fn tenant_send_message<H>(
     State(handler): State<Arc<H>>,
     Path(tenant): Path<String>,
     Json(mut request): Json<SendMessageRequest>,
@@ -60,7 +60,7 @@ where
     send_message(State(handler), Json(request)).await
 }
 
-pub async fn get_task_or_subscribe<H>(
+pub(super) async fn get_task_or_subscribe<H>(
     State(handler): State<Arc<H>>,
     Path(id): Path<String>,
     Query(query): Query<GetTaskQuery>,
@@ -92,7 +92,7 @@ where
         .into_response()
 }
 
-pub async fn tenant_get_task_or_subscribe<H>(
+pub(super) async fn tenant_get_task_or_subscribe<H>(
     State(handler): State<Arc<H>>,
     Path((tenant, id)): Path<(String, String)>,
     Query(mut query): Query<GetTaskQuery>,
@@ -130,7 +130,7 @@ where
     }
 }
 
-pub async fn get_task<H>(
+pub(super) async fn get_task<H>(
     State(handler): State<Arc<H>>,
     Path(id): Path<String>,
     Query(query): Query<GetTaskQuery>,
@@ -155,7 +155,7 @@ where
         .map_err(rest_error)
 }
 
-pub async fn list_tasks<H>(
+pub(super) async fn list_tasks<H>(
     State(handler): State<Arc<H>>,
     Query(request): Query<ListTasksRequest>,
 ) -> Result<Json<ListTasksResponse>, (StatusCode, Json<serde_json::Value>)>
@@ -172,7 +172,7 @@ where
         .map_err(rest_error)
 }
 
-pub async fn tenant_list_tasks<H>(
+pub(super) async fn tenant_list_tasks<H>(
     State(handler): State<Arc<H>>,
     Path(tenant): Path<String>,
     Query(mut request): Query<ListTasksRequest>,
@@ -191,7 +191,7 @@ where
         .map_err(rest_error)
 }
 
-pub async fn cancel_task<H>(
+pub(super) async fn cancel_task<H>(
     State(handler): State<Arc<H>>,
     Path(id): Path<String>,
     Query(query): Query<TenantQuery>,
@@ -215,7 +215,7 @@ where
         .map_err(rest_error)
 }
 
-pub async fn tenant_cancel_task<H>(
+pub(super) async fn tenant_cancel_task<H>(
     State(handler): State<Arc<H>>,
     Path((tenant, id)): Path<(String, String)>,
     Query(mut query): Query<TenantQuery>,
@@ -239,7 +239,7 @@ where
         .map_err(rest_error)
 }
 
-pub async fn get_extended_agent_card<H>(
+pub(super) async fn get_extended_agent_card<H>(
     State(handler): State<Arc<H>>,
     Query(query): Query<TenantQuery>,
 ) -> Result<Json<AgentCard>, (StatusCode, Json<serde_json::Value>)>
@@ -257,7 +257,7 @@ where
         .map_err(rest_error)
 }
 
-pub async fn tenant_get_extended_agent_card<H>(
+pub(super) async fn tenant_get_extended_agent_card<H>(
     State(handler): State<Arc<H>>,
     Path(tenant): Path<String>,
     Query(mut query): Query<TenantQuery>,
@@ -276,7 +276,7 @@ where
         .map_err(rest_error)
 }
 
-pub async fn create_task_push_notification_config<H>(
+pub(super) async fn create_task_push_notification_config<H>(
     State(handler): State<Arc<H>>,
     Path(task_id): Path<String>,
     Query(query): Query<CreateTaskPushNotificationConfigQuery>,
@@ -299,7 +299,7 @@ where
         .map_err(rest_error)
 }
 
-pub async fn tenant_create_task_push_notification_config<H>(
+pub(super) async fn tenant_create_task_push_notification_config<H>(
     State(handler): State<Arc<H>>,
     Path((tenant, task_id)): Path<(String, String)>,
     Query(mut query): Query<CreateTaskPushNotificationConfigQuery>,
@@ -322,7 +322,7 @@ where
         .map_err(rest_error)
 }
 
-pub async fn get_task_push_notification_config<H>(
+pub(super) async fn get_task_push_notification_config<H>(
     State(handler): State<Arc<H>>,
     Path((task_id, id)): Path<(String, String)>,
     Query(query): Query<TenantQuery>,
@@ -343,7 +343,7 @@ where
         .map_err(rest_error)
 }
 
-pub async fn tenant_get_task_push_notification_config<H>(
+pub(super) async fn tenant_get_task_push_notification_config<H>(
     State(handler): State<Arc<H>>,
     Path((tenant, task_id, id)): Path<(String, String, String)>,
     Query(mut query): Query<TenantQuery>,
@@ -364,7 +364,7 @@ where
         .map_err(rest_error)
 }
 
-pub async fn list_task_push_notification_config<H>(
+pub(super) async fn list_task_push_notification_config<H>(
     State(handler): State<Arc<H>>,
     Path(task_id): Path<String>,
     Query(query): Query<ListTaskPushNotificationConfigQuery>,
@@ -389,7 +389,7 @@ where
         .map_err(rest_error)
 }
 
-pub async fn tenant_list_task_push_notification_config<H>(
+pub(super) async fn tenant_list_task_push_notification_config<H>(
     State(handler): State<Arc<H>>,
     Path((tenant, task_id)): Path<(String, String)>,
     Query(mut query): Query<ListTaskPushNotificationConfigQuery>,
@@ -414,7 +414,7 @@ where
         .map_err(rest_error)
 }
 
-pub async fn delete_task_push_notification_config<H>(
+pub(super) async fn delete_task_push_notification_config<H>(
     State(handler): State<Arc<H>>,
     Path((task_id, id)): Path<(String, String)>,
     Query(query): Query<TenantQuery>,
@@ -435,7 +435,7 @@ where
         .map_err(rest_error)
 }
 
-pub async fn tenant_delete_task_push_notification_config<H>(
+pub(super) async fn tenant_delete_task_push_notification_config<H>(
     State(handler): State<Arc<H>>,
     Path((tenant, task_id, id)): Path<(String, String, String)>,
     Query(mut query): Query<TenantQuery>,
@@ -458,7 +458,7 @@ where
 
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct GetTaskQuery {
+pub(super) struct GetTaskQuery {
     #[serde(default)]
     pub tenant: Option<String>,
     #[serde(default)]
@@ -467,7 +467,7 @@ pub struct GetTaskQuery {
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CreateTaskPushNotificationConfigQuery {
+pub(super) struct CreateTaskPushNotificationConfigQuery {
     pub config_id: String,
     #[serde(default)]
     pub tenant: Option<String>,
@@ -475,7 +475,7 @@ pub struct CreateTaskPushNotificationConfigQuery {
 
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ListTaskPushNotificationConfigQuery {
+pub(super) struct ListTaskPushNotificationConfigQuery {
     #[serde(default)]
     pub tenant: Option<String>,
     #[serde(default)]
@@ -486,7 +486,7 @@ pub struct ListTaskPushNotificationConfigQuery {
 
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct TenantQuery {
+pub(super) struct TenantQuery {
     #[serde(default)]
     pub tenant: Option<String>,
 }

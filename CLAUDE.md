@@ -7,8 +7,8 @@ Read `AGENTS.md` first.
 - Language: Rust, edition 2024
 - Protocol: A2A v1.0 RC, locked to tag `v1.0.0-rc`
 - Proto package: `a2a.v1`
-- Current implemented surface: `error`, `jsonrpc`, and `types`
-- Planned next: `server`, `client`, `store`
+- Current implemented surface: `types`, `error`, `jsonrpc`, `server`, `client`, `store`
+- Remaining work: docs, examples, release polish
 - Zero Clawhive dependency
 
 ## Current Design Contract
@@ -24,9 +24,10 @@ Do not treat the old external iCloud note as the implementation contract.
 ```bash
 cargo fmt --all -- --check
 cargo clippy --all-targets --no-default-features -- -D warnings
-cargo check --all-features
+cargo clippy --all-targets --all-features -- -D warnings
 cargo test --no-default-features
 cargo test --all-features
+cargo check --all-features --examples
 ```
 
 Install hooks once per clone:

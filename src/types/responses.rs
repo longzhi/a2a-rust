@@ -7,27 +7,39 @@ use super::message::{Artifact, Message};
 use super::push::TaskPushNotificationConfig;
 use super::task::{Task, TaskStatus};
 
+/// Streaming event emitted when a task status changes.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TaskStatusUpdateEvent {
+    /// Task identifier.
     pub task_id: String,
+    /// Context identifier shared with the task.
     pub context_id: String,
+    /// Updated task status snapshot.
     pub status: TaskStatus,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Optional event metadata.
     pub metadata: Option<JsonObject>,
 }
 
+/// Streaming event emitted when an artifact changes.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TaskArtifactUpdateEvent {
+    /// Task identifier.
     pub task_id: String,
+    /// Context identifier shared with the task.
     pub context_id: String,
+    /// Artifact snapshot or chunk.
     pub artifact: Artifact,
     #[serde(default, skip_serializing_if = "crate::types::is_false")]
+    /// Whether the artifact payload should append to prior chunks.
     pub append: bool,
     #[serde(default, skip_serializing_if = "crate::types::is_false")]
+    /// Whether this is the last chunk for the artifact.
     pub last_chunk: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Optional event metadata.
     pub metadata: Option<JsonObject>,
 }
 
@@ -47,14 +59,18 @@ fn validate_task(task: &Task) -> Result<(), A2AError> {
     Ok(())
 }
 
+/// Oneof-style result for `SendMessage`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum SendMessageResponse {
+    /// Response returned as a task.
     Task(Task),
+    /// Response returned directly as a message.
     Message(Message),
 }
 
 impl SendMessageResponse {
+    /// Validate nested task or message content.
     pub fn validate(&self) -> Result<(), A2AError> {
         match self {
             Self::Task(task) => validate_task(task),
@@ -63,16 +79,22 @@ impl SendMessageResponse {
     }
 }
 
+/// Oneof-style item emitted on streaming operations.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum StreamResponse {
+    /// Task snapshot event.
     Task(Task),
+    /// Message event.
     Message(Message),
+    /// Task status update event.
     StatusUpdate(TaskStatusUpdateEvent),
+    /// Task artifact update event.
     ArtifactUpdate(TaskArtifactUpdateEvent),
 }
 
 impl StreamResponse {
+    /// Validate nested event content.
     pub fn validate(&self) -> Result<(), A2AError> {
         match self {
             Self::Task(task) => validate_task(task),
@@ -89,22 +111,30 @@ impl StreamResponse {
     }
 }
 
+/// Paginated response for `ListTasks`.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ListTasksResponse {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    /// Returned task page.
     pub tasks: Vec<Task>,
+    /// Opaque token for the next page, or an empty string when exhausted.
     pub next_page_token: String,
+    /// Requested page size echoed in the response.
     pub page_size: i32,
+    /// Total number of matching tasks.
     pub total_size: i32,
 }
 
+/// Paginated response for `ListTaskPushNotificationConfig`.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ListTaskPushNotificationConfigResponse {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    /// Returned push-notification configuration page.
     pub configs: Vec<TaskPushNotificationConfig>,
     #[serde(default, skip_serializing_if = "String::is_empty")]
+    /// Opaque token for the next page, or an empty string when exhausted.
     pub next_page_token: String,
 }
 
