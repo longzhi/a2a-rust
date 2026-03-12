@@ -3,4 +3,9 @@ name = "a2a-rust"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+default = ["server", "client"]
+server = []
+client = []
+
 [dependencies]
