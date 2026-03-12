@@ -32,6 +32,12 @@ pub struct SendMessageRequest {
     pub tenant: Option<String>,
 }
 
+impl SendMessageRequest {
+    pub fn validate(&self) -> Result<(), A2AError> {
+        self.message.validate()
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GetTaskRequest {
@@ -61,6 +67,20 @@ pub struct ListTasksRequest {
     pub status_timestamp_after: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub include_artifacts: Option<bool>,
+}
+
+impl ListTasksRequest {
+    pub fn validate(&self) -> Result<(), A2AError> {
+        if let Some(page_size) = self.page_size
+            && !(1..=100).contains(&page_size)
+        {
+            return Err(A2AError::InvalidRequest(
+                "pageSize must be between 1 and 100".to_owned(),
+            ));
+        }
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -133,7 +153,8 @@ impl ListTaskPushNotificationConfigRequest {
 
 #[cfg(test)]
 mod tests {
-    use super::ListTaskPushNotificationConfigRequest;
+    use super::{ListTaskPushNotificationConfigRequest, ListTasksRequest, SendMessageRequest};
+    use crate::types::{Message, Part, Role};
 
     #[test]
     fn list_task_push_notification_config_request_rejects_empty_task_id() {
@@ -146,6 +167,87 @@ mod tests {
 
         let error = request.validate().expect_err("request should be invalid");
         assert!(error.to_string().contains("task_id must not be empty"));
+    }
+
+    #[test]
+    fn list_tasks_request_rejects_out_of_range_page_size() {
+        let request = ListTasksRequest {
+            tenant: None,
+            context_id: None,
+            status: None,
+            page_size: Some(101),
+            page_token: None,
+            history_length: None,
+            status_timestamp_after: None,
+            include_artifacts: None,
+        };
+
+        let error = request.validate().expect_err("request should be invalid");
+        assert!(
+            error
+                .to_string()
+                .contains("pageSize must be between 1 and 100")
+        );
+    }
+
+    #[test]
+    fn send_message_request_rejects_empty_message_parts() {
+        let request = SendMessageRequest {
+            message: Message {
+                message_id: "msg-1".to_owned(),
+                context_id: None,
+                task_id: None,
+                role: Role::User,
+                parts: Vec::new(),
+                metadata: None,
+                extensions: Vec::new(),
+                reference_task_ids: Vec::new(),
+            },
+            configuration: None,
+            metadata: None,
+            tenant: None,
+        };
+
+        let error = request.validate().expect_err("request should be invalid");
+        assert!(
+            error
+                .to_string()
+                .contains("message must contain at least one part")
+        );
+    }
+
+    #[test]
+    fn send_message_request_validates_part_content() {
+        let request = SendMessageRequest {
+            message: Message {
+                message_id: "msg-1".to_owned(),
+                context_id: None,
+                task_id: None,
+                role: Role::User,
+                parts: vec![Part {
+                    text: Some("hello".to_owned()),
+                    raw: Some(vec![104, 105]),
+                    url: None,
+                    data: None,
+                    metadata: None,
+                    filename: None,
+                    media_type: None,
+                }],
+                metadata: None,
+                extensions: Vec::new(),
+                reference_task_ids: Vec::new(),
+            },
+            configuration: None,
+            metadata: None,
+            tenant: None,
+        };
+
+        let error = request.validate().expect_err("request should be invalid");
+        assert!(
+            error
+                .to_string()
+                .contains("part cannot contain more than one")
+        );
     }
 }
 

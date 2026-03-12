@@ -31,27 +31,17 @@ pub struct TaskArtifactUpdateEvent {
     pub metadata: Option<JsonObject>,
 }
 
-fn validate_message(message: &Message) -> Result<(), A2AError> {
-    for part in &message.parts {
-        part.validate()?;
-    }
-
-    Ok(())
-}
-
 fn validate_task(task: &Task) -> Result<(), A2AError> {
     for artifact in &task.artifacts {
-        for part in &artifact.parts {
-            part.validate()?;
-        }
+        artifact.validate()?;
     }
 
     for message in &task.history {
-        validate_message(message)?;
+        message.validate()?;
     }
 
     if let Some(message) = &task.status.message {
-        validate_message(message)?;
+        message.validate()?;
     }
 
     Ok(())
@@ -68,7 +58,7 @@ impl SendMessageResponse {
     pub fn validate(&self) -> Result<(), A2AError> {
         match self {
             Self::Task(task) => validate_task(task),
-            Self::Message(message) => validate_message(message),
+            Self::Message(message) => message.validate(),
         }
     }
 }
@@ -86,21 +76,15 @@ impl StreamResponse {
     pub fn validate(&self) -> Result<(), A2AError> {
         match self {
             Self::Task(task) => validate_task(task),
-            Self::Message(message) => validate_message(message),
+            Self::Message(message) => message.validate(),
             Self::StatusUpdate(update) => {
                 if let Some(message) = &update.status.message {
-                    validate_message(message)?;
+                    message.validate()?;
                 }
 
                 Ok(())
             }
-            Self::ArtifactUpdate(update) => {
-                for part in &update.artifact.parts {
-                    part.validate()?;
-                }
-
-                Ok(())
-            }
+            Self::ArtifactUpdate(update) => update.artifact.validate(),
         }
     }
 }

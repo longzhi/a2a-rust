@@ -81,6 +81,22 @@ pub struct Message {
     pub reference_task_ids: Vec<String>,
 }
 
+impl Message {
+    pub fn validate(&self) -> Result<(), A2AError> {
+        if self.parts.is_empty() {
+            return Err(A2AError::InvalidRequest(
+                "message must contain at least one part".to_owned(),
+            ));
+        }
+
+        for part in &self.parts {
+            part.validate()?;
+        }
+
+        Ok(())
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Artifact {
@@ -95,6 +111,22 @@ pub struct Artifact {
     pub metadata: Option<JsonObject>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub extensions: Vec<String>,
+}
+
+impl Artifact {
+    pub fn validate(&self) -> Result<(), A2AError> {
+        if self.parts.is_empty() {
+            return Err(A2AError::InvalidRequest(
+                "artifact must contain at least one part".to_owned(),
+            ));
+        }
+
+        for part in &self.parts {
+            part.validate()?;
+        }
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -201,5 +233,45 @@ mod tests {
         assert_eq!(message_round_trip.message_id, "msg-1");
         assert_eq!(artifact_round_trip.artifact_id, "artifact-1");
         assert_eq!(artifact_round_trip.parts.len(), 1);
+    }
+
+    #[test]
+    fn message_validate_rejects_empty_parts() {
+        let message = Message {
+            message_id: "msg-1".to_owned(),
+            context_id: None,
+            task_id: None,
+            role: Role::User,
+            parts: Vec::new(),
+            metadata: None,
+            extensions: Vec::new(),
+            reference_task_ids: Vec::new(),
+        };
+
+        let error = message.validate().expect_err("message should be invalid");
+        assert!(
+            error
+                .to_string()
+                .contains("message must contain at least one part")
+        );
+    }
+
+    #[test]
+    fn artifact_validate_rejects_empty_parts() {
+        let artifact = Artifact {
+            artifact_id: "artifact-1".to_owned(),
+            name: None,
+            description: None,
+            parts: Vec::new(),
+            metadata: None,
+            extensions: Vec::new(),
+        };
+
+        let error = artifact.validate().expect_err("artifact should be invalid");
+        assert!(
+            error
+                .to_string()
+                .contains("artifact must contain at least one part")
+        );
     }
 }
