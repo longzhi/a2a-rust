@@ -2,11 +2,12 @@ use std::sync::Arc;
 
 use axum::Json;
 use axum::extract::{Path, Query, State};
-use axum::http::StatusCode;
+use axum::http::{HeaderMap, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use serde::Deserialize;
 
 use crate::A2AError;
+use crate::error::ProblemDetails;
 use crate::types::{
     AgentCard, CancelTaskRequest, CreateTaskPushNotificationConfigRequest,
     DeleteTaskPushNotificationConfigRequest, GetExtendedAgentCardRequest,
@@ -21,7 +22,7 @@ use super::streaming;
 
 pub(super) async fn get_agent_card<H>(
     State(handler): State<Arc<H>>,
-) -> Result<Json<AgentCard>, (StatusCode, Json<serde_json::Value>)>
+) -> Result<Json<AgentCard>, RestErrorResponse>
 where
     H: A2AHandler,
 {
@@ -30,11 +31,13 @@ where
 
 pub(super) async fn send_message<H>(
     State(handler): State<Arc<H>>,
+    headers: HeaderMap,
     Json(request): Json<SendMessageRequest>,
-) -> Result<Json<SendMessageResponse>, (StatusCode, Json<serde_json::Value>)>
+) -> Result<Json<SendMessageResponse>, RestErrorResponse>
 where
     H: A2AHandler,
 {
+    handler.validate_protocol_headers(&headers).await?;
     request.validate()?;
 
     handler
@@ -50,24 +53,30 @@ where
 
 pub(super) async fn tenant_send_message<H>(
     State(handler): State<Arc<H>>,
+    headers: HeaderMap,
     Path(tenant): Path<String>,
     Json(mut request): Json<SendMessageRequest>,
-) -> Result<Json<SendMessageResponse>, (StatusCode, Json<serde_json::Value>)>
+) -> Result<Json<SendMessageResponse>, RestErrorResponse>
 where
     H: A2AHandler,
 {
     request.tenant = Some(tenant);
-    send_message(State(handler), Json(request)).await
+    send_message(State(handler), headers, Json(request)).await
 }
 
 pub(super) async fn get_task_or_subscribe<H>(
     State(handler): State<Arc<H>>,
+    headers: HeaderMap,
     Path(id): Path<String>,
     Query(query): Query<GetTaskQuery>,
 ) -> Response
 where
     H: A2AHandler,
 {
+    if let Err(error) = handler.validate_protocol_headers(&headers).await {
+        return rest_error(error).into_response();
+    }
+
     if let Err(error) = reject_query_tenant(&query.tenant) {
         return error.into_response();
     }
@@ -87,19 +96,24 @@ where
         };
     }
 
-    get_task(State(handler), Path(id), Query(query))
+    get_task(State(handler), headers, Path(id), Query(query))
         .await
         .into_response()
 }
 
 pub(super) async fn tenant_get_task_or_subscribe<H>(
     State(handler): State<Arc<H>>,
+    headers: HeaderMap,
     Path((tenant, id)): Path<(String, String)>,
     Query(mut query): Query<GetTaskQuery>,
 ) -> Response
 where
     H: A2AHandler,
 {
+    if let Err(error) = handler.validate_protocol_headers(&headers).await {
+        return rest_error(error).into_response();
+    }
+
     query.tenant = Some(tenant);
 
     if let Some(id) = id.strip_suffix(":subscribe") {
@@ -132,12 +146,14 @@ where
 
 pub(super) async fn get_task<H>(
     State(handler): State<Arc<H>>,
+    headers: HeaderMap,
     Path(id): Path<String>,
     Query(query): Query<GetTaskQuery>,
-) -> Result<Json<Task>, (StatusCode, Json<serde_json::Value>)>
+) -> Result<Json<Task>, RestErrorResponse>
 where
     H: A2AHandler,
 {
+    handler.validate_protocol_headers(&headers).await?;
     reject_query_tenant(&query.tenant)?;
 
     if id.ends_with(":cancel") || id.ends_with(":subscribe") {
@@ -157,11 +173,13 @@ where
 
 pub(super) async fn list_tasks<H>(
     State(handler): State<Arc<H>>,
+    headers: HeaderMap,
     Query(request): Query<ListTasksRequest>,
-) -> Result<Json<ListTasksResponse>, (StatusCode, Json<serde_json::Value>)>
+) -> Result<Json<ListTasksResponse>, RestErrorResponse>
 where
     H: A2AHandler,
 {
+    handler.validate_protocol_headers(&headers).await?;
     reject_query_tenant(&request.tenant)?;
     request.validate()?;
 
@@ -174,12 +192,14 @@ where
 
 pub(super) async fn tenant_list_tasks<H>(
     State(handler): State<Arc<H>>,
+    headers: HeaderMap,
     Path(tenant): Path<String>,
     Query(mut request): Query<ListTasksRequest>,
-) -> Result<Json<ListTasksResponse>, (StatusCode, Json<serde_json::Value>)>
+) -> Result<Json<ListTasksResponse>, RestErrorResponse>
 where
     H: A2AHandler,
 {
+    handler.validate_protocol_headers(&headers).await?;
     request.tenant = Some(tenant);
 
     request.validate()?;
@@ -193,12 +213,14 @@ where
 
 pub(super) async fn cancel_task<H>(
     State(handler): State<Arc<H>>,
+    headers: HeaderMap,
     Path(id): Path<String>,
     Query(query): Query<TenantQuery>,
-) -> Result<Json<Task>, (StatusCode, Json<serde_json::Value>)>
+) -> Result<Json<Task>, RestErrorResponse>
 where
     H: A2AHandler,
 {
+    handler.validate_protocol_headers(&headers).await?;
     reject_query_tenant(&query.tenant)?;
 
     let Some(id) = id.strip_suffix(":cancel") else {
@@ -217,12 +239,14 @@ where
 
 pub(super) async fn tenant_cancel_task<H>(
     State(handler): State<Arc<H>>,
+    headers: HeaderMap,
     Path((tenant, id)): Path<(String, String)>,
     Query(mut query): Query<TenantQuery>,
-) -> Result<Json<Task>, (StatusCode, Json<serde_json::Value>)>
+) -> Result<Json<Task>, RestErrorResponse>
 where
     H: A2AHandler,
 {
+    handler.validate_protocol_headers(&headers).await?;
     query.tenant = Some(tenant);
 
     let Some(id) = id.strip_suffix(":cancel") else {
@@ -241,11 +265,13 @@ where
 
 pub(super) async fn get_extended_agent_card<H>(
     State(handler): State<Arc<H>>,
+    headers: HeaderMap,
     Query(query): Query<TenantQuery>,
-) -> Result<Json<AgentCard>, (StatusCode, Json<serde_json::Value>)>
+) -> Result<Json<AgentCard>, RestErrorResponse>
 where
     H: A2AHandler,
 {
+    handler.validate_protocol_headers(&headers).await?;
     reject_query_tenant(&query.tenant)?;
 
     handler
@@ -259,12 +285,14 @@ where
 
 pub(super) async fn tenant_get_extended_agent_card<H>(
     State(handler): State<Arc<H>>,
+    headers: HeaderMap,
     Path(tenant): Path<String>,
     Query(mut query): Query<TenantQuery>,
-) -> Result<Json<AgentCard>, (StatusCode, Json<serde_json::Value>)>
+) -> Result<Json<AgentCard>, RestErrorResponse>
 where
     H: A2AHandler,
 {
+    handler.validate_protocol_headers(&headers).await?;
     query.tenant = Some(tenant);
 
     handler
@@ -278,13 +306,15 @@ where
 
 pub(super) async fn create_task_push_notification_config<H>(
     State(handler): State<Arc<H>>,
+    headers: HeaderMap,
     Path(task_id): Path<String>,
     Query(query): Query<CreateTaskPushNotificationConfigQuery>,
     Json(config): Json<PushNotificationConfig>,
-) -> Result<Json<TaskPushNotificationConfig>, (StatusCode, Json<serde_json::Value>)>
+) -> Result<Json<TaskPushNotificationConfig>, RestErrorResponse>
 where
     H: A2AHandler,
 {
+    handler.validate_protocol_headers(&headers).await?;
     reject_query_tenant(&query.tenant)?;
 
     handler
@@ -301,13 +331,15 @@ where
 
 pub(super) async fn tenant_create_task_push_notification_config<H>(
     State(handler): State<Arc<H>>,
+    headers: HeaderMap,
     Path((tenant, task_id)): Path<(String, String)>,
     Query(mut query): Query<CreateTaskPushNotificationConfigQuery>,
     Json(config): Json<PushNotificationConfig>,
-) -> Result<Json<TaskPushNotificationConfig>, (StatusCode, Json<serde_json::Value>)>
+) -> Result<Json<TaskPushNotificationConfig>, RestErrorResponse>
 where
     H: A2AHandler,
 {
+    handler.validate_protocol_headers(&headers).await?;
     query.tenant = Some(tenant);
 
     handler
@@ -324,12 +356,14 @@ where
 
 pub(super) async fn get_task_push_notification_config<H>(
     State(handler): State<Arc<H>>,
+    headers: HeaderMap,
     Path((task_id, id)): Path<(String, String)>,
     Query(query): Query<TenantQuery>,
-) -> Result<Json<TaskPushNotificationConfig>, (StatusCode, Json<serde_json::Value>)>
+) -> Result<Json<TaskPushNotificationConfig>, RestErrorResponse>
 where
     H: A2AHandler,
 {
+    handler.validate_protocol_headers(&headers).await?;
     reject_query_tenant(&query.tenant)?;
 
     handler
@@ -345,12 +379,14 @@ where
 
 pub(super) async fn tenant_get_task_push_notification_config<H>(
     State(handler): State<Arc<H>>,
+    headers: HeaderMap,
     Path((tenant, task_id, id)): Path<(String, String, String)>,
     Query(mut query): Query<TenantQuery>,
-) -> Result<Json<TaskPushNotificationConfig>, (StatusCode, Json<serde_json::Value>)>
+) -> Result<Json<TaskPushNotificationConfig>, RestErrorResponse>
 where
     H: A2AHandler,
 {
+    handler.validate_protocol_headers(&headers).await?;
     query.tenant = Some(tenant);
 
     handler
@@ -366,12 +402,14 @@ where
 
 pub(super) async fn list_task_push_notification_config<H>(
     State(handler): State<Arc<H>>,
+    headers: HeaderMap,
     Path(task_id): Path<String>,
     Query(query): Query<ListTaskPushNotificationConfigQuery>,
-) -> Result<Json<ListTaskPushNotificationConfigResponse>, (StatusCode, Json<serde_json::Value>)>
+) -> Result<Json<ListTaskPushNotificationConfigResponse>, RestErrorResponse>
 where
     H: A2AHandler,
 {
+    handler.validate_protocol_headers(&headers).await?;
     reject_query_tenant(&query.tenant)?;
 
     let request = ListTaskPushNotificationConfigRequest {
@@ -391,12 +429,14 @@ where
 
 pub(super) async fn tenant_list_task_push_notification_config<H>(
     State(handler): State<Arc<H>>,
+    headers: HeaderMap,
     Path((tenant, task_id)): Path<(String, String)>,
     Query(mut query): Query<ListTaskPushNotificationConfigQuery>,
-) -> Result<Json<ListTaskPushNotificationConfigResponse>, (StatusCode, Json<serde_json::Value>)>
+) -> Result<Json<ListTaskPushNotificationConfigResponse>, RestErrorResponse>
 where
     H: A2AHandler,
 {
+    handler.validate_protocol_headers(&headers).await?;
     query.tenant = Some(tenant);
 
     let request = ListTaskPushNotificationConfigRequest {
@@ -416,12 +456,14 @@ where
 
 pub(super) async fn delete_task_push_notification_config<H>(
     State(handler): State<Arc<H>>,
+    headers: HeaderMap,
     Path((task_id, id)): Path<(String, String)>,
     Query(query): Query<TenantQuery>,
-) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)>
+) -> Result<Json<serde_json::Value>, RestErrorResponse>
 where
     H: A2AHandler,
 {
+    handler.validate_protocol_headers(&headers).await?;
     reject_query_tenant(&query.tenant)?;
 
     handler
@@ -437,12 +479,14 @@ where
 
 pub(super) async fn tenant_delete_task_push_notification_config<H>(
     State(handler): State<Arc<H>>,
+    headers: HeaderMap,
     Path((tenant, task_id, id)): Path<(String, String, String)>,
     Query(mut query): Query<TenantQuery>,
-) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)>
+) -> Result<Json<serde_json::Value>, RestErrorResponse>
 where
     H: A2AHandler,
 {
+    handler.validate_protocol_headers(&headers).await?;
     query.tenant = Some(tenant);
 
     handler
@@ -491,28 +535,20 @@ pub(super) struct TenantQuery {
     pub tenant: Option<String>,
 }
 
-pub(super) fn rest_error(error: A2AError) -> (StatusCode, Json<serde_json::Value>) {
-    let status = error.status_code();
-    let body = serde_json::json!({
-        "error": {
-            "code": error.code(),
-            "message": error.to_string(),
-            "data": error.to_jsonrpc_error().data,
-        }
-    });
-
-    (status, Json(body))
+pub(super) fn rest_error(error: A2AError) -> RestErrorResponse {
+    RestErrorResponse {
+        status: error.status_code(),
+        body: Box::new(error.to_problem_details()),
+    }
 }
 
-impl From<A2AError> for (StatusCode, Json<serde_json::Value>) {
+impl From<A2AError> for RestErrorResponse {
     fn from(value: A2AError) -> Self {
         rest_error(value)
     }
 }
 
-fn reject_query_tenant(
-    tenant: &Option<String>,
-) -> Result<(), (StatusCode, Json<serde_json::Value>)> {
+fn reject_query_tenant(tenant: &Option<String>) -> Result<(), RestErrorResponse> {
     if tenant.is_some() {
         return Err(rest_error(A2AError::InvalidRequest(
             "tenant must be supplied via tenant-prefixed routes".to_owned(),
@@ -520,4 +556,20 @@ fn reject_query_tenant(
     }
 
     Ok(())
+}
+
+pub(super) struct RestErrorResponse {
+    status: StatusCode,
+    body: Box<ProblemDetails>,
+}
+
+impl IntoResponse for RestErrorResponse {
+    fn into_response(self) -> Response {
+        let mut response = (self.status, Json(*self.body)).into_response();
+        response.headers_mut().insert(
+            header::CONTENT_TYPE,
+            header::HeaderValue::from_static("application/problem+json"),
+        );
+        response
+    }
 }

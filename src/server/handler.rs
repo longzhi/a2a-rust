@@ -1,9 +1,12 @@
+use std::collections::BTreeSet;
 use std::pin::Pin;
 
 use async_trait::async_trait;
+use axum::http::HeaderMap;
 use futures_core::Stream;
 
 use crate::A2AError;
+use crate::jsonrpc::PROTOCOL_VERSION;
 use crate::types::{
     AgentCard, CancelTaskRequest, CreateTaskPushNotificationConfigRequest,
     DeleteTaskPushNotificationConfigRequest, GetExtendedAgentCardRequest,
@@ -171,4 +174,89 @@ pub trait A2AHandler: Send + Sync + 'static {
             "GetExtendedAgentCard".to_owned(),
         ))
     }
+
+    /// Validate `A2A-Version` and `A2A-Extensions` request headers.
+    async fn validate_protocol_headers(&self, headers: &HeaderMap) -> Result<(), A2AError> {
+        let card = self.get_agent_card().await?;
+        validate_supported_version(&card, headers)?;
+        validate_required_extensions(&card, headers)
+    }
+
+    /// Enforce that the request version is supported by the advertised interfaces.
+    async fn require_supported_version(&self, headers: &HeaderMap) -> Result<(), A2AError> {
+        let card = self.get_agent_card().await?;
+        validate_supported_version(&card, headers)
+    }
+
+    /// Enforce that all required agent extensions are acknowledged by the caller.
+    async fn require_required_extensions(&self, headers: &HeaderMap) -> Result<(), A2AError> {
+        let card = self.get_agent_card().await?;
+        validate_required_extensions(&card, headers)
+    }
+}
+
+fn header_value(headers: &HeaderMap, name: &str) -> Option<String> {
+    headers
+        .get(name)
+        .and_then(|value| value.to_str().ok())
+        .map(ToOwned::to_owned)
+}
+
+fn validate_supported_version(card: &AgentCard, headers: &HeaderMap) -> Result<(), A2AError> {
+    let requested_version = match header_value(headers, "A2A-Version") {
+        Some(version) if version.trim().is_empty() => "0.3".to_owned(),
+        Some(version) => version,
+        None => PROTOCOL_VERSION.to_owned(),
+    };
+    let supported_versions = card
+        .supported_interfaces
+        .iter()
+        .map(|interface| interface.protocol_version.as_str())
+        .collect::<BTreeSet<_>>();
+
+    if supported_versions.is_empty() || supported_versions.contains(requested_version.as_str()) {
+        return Ok(());
+    }
+
+    Err(A2AError::VersionNotSupported(requested_version))
+}
+
+fn validate_required_extensions(card: &AgentCard, headers: &HeaderMap) -> Result<(), A2AError> {
+    let required_extensions = card
+        .capabilities
+        .extensions
+        .iter()
+        .filter(|extension| extension.required)
+        .map(|extension| extension.uri.as_str())
+        .collect::<BTreeSet<_>>();
+
+    if required_extensions.is_empty() {
+        return Ok(());
+    }
+
+    let announced_extensions = header_value(headers, "A2A-Extensions")
+        .into_iter()
+        .flat_map(|value| {
+            value
+                .split(',')
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(ToOwned::to_owned)
+                .collect::<Vec<_>>()
+        })
+        .collect::<BTreeSet<_>>();
+
+    let missing = required_extensions
+        .into_iter()
+        .filter(|extension| !announced_extensions.contains(*extension))
+        .collect::<Vec<_>>();
+
+    if missing.is_empty() {
+        return Ok(());
+    }
+
+    Err(A2AError::ExtensionSupportRequired(format!(
+        "missing required extensions: {}",
+        missing.join(", ")
+    )))
 }

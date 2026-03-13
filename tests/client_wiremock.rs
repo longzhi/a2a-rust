@@ -254,6 +254,71 @@ async fn client_parses_sse_streams_with_crlf_frame_delimiters() {
     }
 }
 
+#[tokio::test]
+async fn client_maps_http_problem_details_to_a2a_error() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/.well-known/agent-card.json"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(agent_card(
+            vec![interface("/", "HTTP+JSON")],
+            capabilities(false, false),
+        )))
+        .mount(&server)
+        .await;
+    Mock::given(method("POST"))
+        .and(path("/message:send"))
+        .respond_with(ResponseTemplate::new(400).set_body_json(json!({
+            "type": "https://a2a-protocol.org/errors/extension-support-required",
+            "title": "Extension support required",
+            "status": 400,
+            "detail": "missing required extensions: https://example.com/ext/required",
+            "reason": "EXTENSION_SUPPORT_REQUIRED",
+            "domain": "a2a-protocol.org",
+        })))
+        .mount(&server)
+        .await;
+
+    let client = A2AClient::new(&server.uri()).expect("client should build");
+    let error = client
+        .send_message(user_message_request(None))
+        .await
+        .expect_err("problem details should map to an A2A error");
+
+    match error {
+        A2AError::ExtensionSupportRequired(detail) => {
+            assert!(detail.contains("missing required extensions"));
+        }
+        other => panic!("expected extension-support-required, got {other}"),
+    }
+}
+
+#[tokio::test]
+async fn client_rejects_agent_cards_without_a_supported_protocol_version() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/.well-known/agent-card.json"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(agent_card(
+            vec![interface_with_version("/rpc", "JSONRPC", "0.9")],
+            capabilities(false, false),
+        )))
+        .mount(&server)
+        .await;
+
+    let client = A2AClient::new(&server.uri()).expect("client should build");
+    let error = client
+        .send_message(user_message_request(None))
+        .await
+        .expect_err("unsupported interface versions should fail");
+
+    match error {
+        A2AError::VersionNotSupported(detail) => {
+            assert!(detail.contains("1.0"));
+            assert!(detail.contains("0.9"));
+        }
+        other => panic!("expected version-not-supported, got {other}"),
+    }
+}
+
 async fn mount_jsonrpc_discovery(server: &MockServer) {
     Mock::given(method("GET"))
         .and(path("/.well-known/agent-card.json"))
@@ -296,11 +361,19 @@ fn agent_card(interfaces: Vec<AgentInterface>, capabilities: AgentCapabilities) 
 }
 
 fn interface(url: &str, protocol_binding: &str) -> AgentInterface {
+    interface_with_version(url, protocol_binding, "1.0")
+}
+
+fn interface_with_version(
+    url: &str,
+    protocol_binding: &str,
+    protocol_version: &str,
+) -> AgentInterface {
     AgentInterface {
         url: url.to_owned(),
         protocol_binding: protocol_binding.to_owned(),
         tenant: None,
-        protocol_version: "1.0".to_owned(),
+        protocol_version: protocol_version.to_owned(),
     }
 }
 
