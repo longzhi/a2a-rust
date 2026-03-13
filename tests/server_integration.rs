@@ -23,6 +23,9 @@ struct StreamingHandler;
 #[derive(Clone)]
 struct TenantEchoHandler;
 
+#[derive(Clone)]
+struct RequiredExtensionHandler;
+
 fn tenant_metadata(tenant: Option<String>) -> Option<serde_json::Map<String, serde_json::Value>> {
     tenant.map(|tenant| {
         let mut metadata = serde_json::Map::new();
@@ -391,6 +394,50 @@ impl A2AHandler for TenantEchoHandler {
     }
 }
 
+#[async_trait]
+impl A2AHandler for RequiredExtensionHandler {
+    async fn get_agent_card(&self) -> Result<AgentCard, A2AError> {
+        Ok(AgentCard {
+            name: "Extension Agent".to_owned(),
+            description: "Requires an extension".to_owned(),
+            supported_interfaces: vec![AgentInterface {
+                url: "https://example.com/rpc".to_owned(),
+                protocol_binding: "JSONRPC".to_owned(),
+                tenant: None,
+                protocol_version: "1.0".to_owned(),
+            }],
+            provider: None,
+            version: "0.1.0".to_owned(),
+            documentation_url: None,
+            capabilities: AgentCapabilities {
+                streaming: Some(false),
+                push_notifications: Some(false),
+                extensions: vec![a2a_rust::types::AgentExtension {
+                    uri: "https://example.com/extensions/required".to_owned(),
+                    description: "Required extension".to_owned(),
+                    required: true,
+                    params: None,
+                }],
+                extended_agent_card: Some(false),
+            },
+            security_schemes: Default::default(),
+            security_requirements: Vec::new(),
+            default_input_modes: vec!["text/plain".to_owned()],
+            default_output_modes: vec!["text/plain".to_owned()],
+            skills: Vec::new(),
+            signatures: Vec::new(),
+            icon_url: None,
+        })
+    }
+
+    async fn send_message(
+        &self,
+        request: SendMessageRequest,
+    ) -> Result<SendMessageResponse, A2AError> {
+        TestHandler.send_message(request).await
+    }
+}
+
 #[tokio::test]
 async fn well_known_endpoint_serves_agent_card() {
     let response = router(TestHandler)
@@ -471,6 +518,86 @@ async fn tenant_message_route_uses_path_tenant() {
 }
 
 #[tokio::test]
+async fn rest_version_mismatch_returns_problem_details() {
+    let body = serde_json::json!({
+        "message": {
+            "messageId": "msg-1",
+            "role": "ROLE_USER",
+            "parts": [{"text": "ping"}]
+        }
+    });
+
+    let response = router(TestHandler)
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/message:send")
+                .header("content-type", "application/json")
+                .header("A2A-Version", "9.9")
+                .body(Body::from(body.to_string()))
+                .expect("request should build"),
+        )
+        .await
+        .expect("response should succeed");
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    assert_eq!(
+        response.headers()["content-type"],
+        "application/problem+json"
+    );
+
+    let bytes = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("body should read");
+    let json: serde_json::Value = serde_json::from_slice(&bytes).expect("body should deserialize");
+    assert_eq!(
+        json["type"],
+        "https://a2a-protocol.org/errors/version-not-supported"
+    );
+    assert_eq!(json["reason"], "VERSION_NOT_SUPPORTED");
+    assert_eq!(json["status"], 400);
+}
+
+#[tokio::test]
+async fn rest_missing_required_extension_returns_problem_details() {
+    let body = serde_json::json!({
+        "message": {
+            "messageId": "msg-1",
+            "role": "ROLE_USER",
+            "parts": [{"text": "ping"}]
+        }
+    });
+
+    let response = router(RequiredExtensionHandler)
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/message:send")
+                .header("content-type", "application/json")
+                .body(Body::from(body.to_string()))
+                .expect("request should build"),
+        )
+        .await
+        .expect("response should succeed");
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    assert_eq!(
+        response.headers()["content-type"],
+        "application/problem+json"
+    );
+
+    let bytes = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("body should read");
+    let json: serde_json::Value = serde_json::from_slice(&bytes).expect("body should deserialize");
+    assert_eq!(
+        json["type"],
+        "https://a2a-protocol.org/errors/extension-support-required"
+    );
+    assert_eq!(json["reason"], "EXTENSION_SUPPORT_REQUIRED");
+}
+
+#[tokio::test]
 async fn jsonrpc_send_message_dispatches_pascal_case_method() {
     let body = serde_json::json!({
         "jsonrpc": "2.0",
@@ -505,6 +632,47 @@ async fn jsonrpc_send_message_dispatches_pascal_case_method() {
     let json: serde_json::Value = serde_json::from_slice(&bytes).expect("body should deserialize");
     assert_eq!(json["id"], "req-1");
     assert_eq!(json["result"]["message"]["parts"][0]["text"], "pong");
+}
+
+#[tokio::test]
+async fn jsonrpc_missing_required_extension_returns_structured_error_info() {
+    let body = serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": "req-ext",
+        "method": "SendMessage",
+        "params": {
+            "message": {
+                "messageId": "msg-1",
+                "role": "ROLE_USER",
+                "parts": [{"text": "ping"}]
+            }
+        }
+    });
+
+    let response = router(RequiredExtensionHandler)
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/rpc")
+                .header("content-type", "application/json")
+                .body(Body::from(body.to_string()))
+                .expect("request should build"),
+        )
+        .await
+        .expect("response should succeed");
+
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let bytes = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("body should read");
+    let json: serde_json::Value = serde_json::from_slice(&bytes).expect("body should deserialize");
+    assert_eq!(json["error"]["code"], -32008);
+    assert_eq!(
+        json["error"]["data"]["reason"],
+        "EXTENSION_SUPPORT_REQUIRED"
+    );
+    assert_eq!(json["error"]["data"]["domain"], "a2a-protocol.org");
 }
 
 #[tokio::test]
@@ -683,7 +851,8 @@ async fn non_tenant_list_tasks_rejects_query_tenant() {
         .await
         .expect("body should read");
     let json: serde_json::Value = serde_json::from_slice(&bytes).expect("body should deserialize");
-    assert_eq!(json["error"]["code"], -32600);
+    assert_eq!(json["reason"], "INVALID_REQUEST");
+    assert_eq!(json["status"], 400);
 }
 
 #[tokio::test]
@@ -734,7 +903,8 @@ async fn rest_get_extended_agent_card_returns_default_error() {
         .await
         .expect("body should read");
     let json: serde_json::Value = serde_json::from_slice(&bytes).expect("body should deserialize");
-    assert_eq!(json["error"]["code"], -32007);
+    assert_eq!(json["reason"], "EXTENDED_AGENT_CARD_NOT_CONFIGURED");
+    assert_eq!(json["status"], 400);
 }
 
 #[tokio::test]
@@ -755,7 +925,8 @@ async fn get_cancel_path_returns_not_found() {
         .await
         .expect("body should read");
     let json: serde_json::Value = serde_json::from_slice(&bytes).expect("body should deserialize");
-    assert_eq!(json["error"]["code"], -32601);
+    assert_eq!(json["reason"], "METHOD_NOT_FOUND");
+    assert_eq!(json["status"], 404);
 }
 
 #[tokio::test]
@@ -786,7 +957,8 @@ async fn streaming_route_returns_unsupported_when_capability_is_disabled() {
         .await
         .expect("body should read");
     let json: serde_json::Value = serde_json::from_slice(&bytes).expect("body should deserialize");
-    assert_eq!(json["error"]["code"], -32004);
+    assert_eq!(json["reason"], "UNSUPPORTED_OPERATION");
+    assert_eq!(json["status"], 400);
 }
 
 #[tokio::test]
@@ -807,7 +979,8 @@ async fn subscribe_route_returns_unsupported_when_capability_is_disabled() {
         .await
         .expect("body should read");
     let json: serde_json::Value = serde_json::from_slice(&bytes).expect("body should deserialize");
-    assert_eq!(json["error"]["code"], -32004);
+    assert_eq!(json["reason"], "UNSUPPORTED_OPERATION");
+    assert_eq!(json["status"], 400);
 }
 
 #[tokio::test]
@@ -828,7 +1001,8 @@ async fn push_config_route_returns_not_supported_when_capability_is_disabled() {
         .await
         .expect("body should read");
     let json: serde_json::Value = serde_json::from_slice(&bytes).expect("body should deserialize");
-    assert_eq!(json["error"]["code"], -32003);
+    assert_eq!(json["reason"], "PUSH_NOTIFICATION_NOT_SUPPORTED");
+    assert_eq!(json["status"], 400);
 }
 
 #[tokio::test]
@@ -1001,7 +1175,8 @@ async fn non_tenant_subscribe_rejects_query_tenant() {
         .await
         .expect("body should read");
     let json: serde_json::Value = serde_json::from_slice(&bytes).expect("body should deserialize");
-    assert_eq!(json["error"]["code"], -32600);
+    assert_eq!(json["reason"], "INVALID_REQUEST");
+    assert_eq!(json["status"], 400);
 }
 
 #[tokio::test]

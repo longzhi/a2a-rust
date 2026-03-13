@@ -10,6 +10,7 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 
 use crate::A2AError;
+use crate::error::ProblemDetails;
 use crate::jsonrpc::{
     CONTENT_TYPE_NOT_SUPPORTED, EXTENDED_AGENT_CARD_NOT_CONFIGURED, EXTENSION_SUPPORT_REQUIRED,
     INTERNAL_ERROR, INVALID_AGENT_RESPONSE, INVALID_PARAMS, INVALID_REQUEST, JSONRPC_VERSION,
@@ -490,7 +491,11 @@ impl A2AClient {
                 .map_err(|error| A2AError::InvalidAgentResponse(error.to_string()));
         }
 
-        if let Ok(error) = serde_json::from_slice::<RestErrorEnvelope>(&bytes) {
+        if let Ok(problem) = serde_json::from_slice::<ProblemDetails>(&bytes) {
+            return Err(problem.to_a2a_error());
+        }
+
+        if let Ok(error) = serde_json::from_slice::<LegacyRestErrorEnvelope>(&bytes) {
             return Err(map_jsonrpc_error(error.error));
         }
 
@@ -507,7 +512,11 @@ impl A2AClient {
         let status = response.status();
         if !status.is_success() {
             let bytes = response.bytes().await?;
-            if let Ok(error) = serde_json::from_slice::<RestErrorEnvelope>(&bytes) {
+            if let Ok(problem) = serde_json::from_slice::<ProblemDetails>(&bytes) {
+                return Err(problem.to_a2a_error());
+            }
+
+            if let Ok(error) = serde_json::from_slice::<LegacyRestErrorEnvelope>(&bytes) {
                 return Err(map_jsonrpc_error(error.error));
             }
 
@@ -534,7 +543,17 @@ fn select_transport(
     base_url: &Url,
     interfaces: &[AgentInterface],
 ) -> Result<TransportEndpoint, A2AError> {
+    let mut advertised_versions = Vec::new();
+
     for interface in interfaces {
+        if !interface
+            .protocol_version
+            .eq_ignore_ascii_case(PROTOCOL_VERSION)
+        {
+            advertised_versions.push(interface.protocol_version.clone());
+            continue;
+        }
+
         if interface.protocol_binding.eq_ignore_ascii_case("JSONRPC") {
             return resolve_interface_url(base_url, &interface.url).map(TransportEndpoint::JsonRpc);
         }
@@ -546,6 +565,16 @@ fn select_transport(
         }
     }
 
+    if !advertised_versions.is_empty() {
+        advertised_versions.sort();
+        advertised_versions.dedup();
+        return Err(A2AError::VersionNotSupported(format!(
+            "client supports A2A-Version {}, agent advertised {}",
+            PROTOCOL_VERSION,
+            advertised_versions.join(", ")
+        )));
+    }
+
     Err(A2AError::InvalidAgentResponse(
         "agent card does not advertise a supported interface".to_owned(),
     ))
@@ -555,16 +584,37 @@ fn select_http_json_transport(
     base_url: &Url,
     interfaces: &[AgentInterface],
 ) -> Result<Url, A2AError> {
-    interfaces
-        .iter()
-        .find(|interface| interface.protocol_binding.eq_ignore_ascii_case("HTTP+JSON"))
-        .ok_or_else(|| {
-            A2AError::InvalidAgentResponse(
-                "agent card does not advertise an HTTP+JSON interface".to_owned(),
-            )
-        })
-        .and_then(|interface| resolve_interface_url(base_url, &interface.url))
-        .map(ensure_trailing_slash)
+    let mut advertised_versions = Vec::new();
+
+    for interface in interfaces {
+        if !interface.protocol_binding.eq_ignore_ascii_case("HTTP+JSON") {
+            continue;
+        }
+
+        if !interface
+            .protocol_version
+            .eq_ignore_ascii_case(PROTOCOL_VERSION)
+        {
+            advertised_versions.push(interface.protocol_version.clone());
+            continue;
+        }
+
+        return resolve_interface_url(base_url, &interface.url).map(ensure_trailing_slash);
+    }
+
+    if !advertised_versions.is_empty() {
+        advertised_versions.sort();
+        advertised_versions.dedup();
+        return Err(A2AError::VersionNotSupported(format!(
+            "client supports A2A-Version {}, agent advertised HTTP+JSON {}",
+            PROTOCOL_VERSION,
+            advertised_versions.join(", ")
+        )));
+    }
+
+    Err(A2AError::InvalidAgentResponse(
+        "agent card does not advertise an HTTP+JSON interface".to_owned(),
+    ))
 }
 
 fn rest_url(base_url: &Url, tenant: Option<&str>, segments: &[&str]) -> Result<Url, A2AError> {
@@ -586,6 +636,10 @@ fn rest_url(base_url: &Url, tenant: Option<&str>, segments: &[&str]) -> Result<U
 }
 
 fn map_jsonrpc_error(error: JsonRpcError) -> A2AError {
+    if let Some(info) = error.first_error_info() {
+        return A2AError::from_error_info(error.code, &error.message, Some(&info));
+    }
+
     let detail = error
         .data
         .as_ref()
@@ -748,7 +802,7 @@ struct ListTaskPushNotificationConfigQuery {
 }
 
 #[derive(serde::Deserialize)]
-struct RestErrorEnvelope {
+struct LegacyRestErrorEnvelope {
     error: JsonRpcError,
 }
 
@@ -855,5 +909,23 @@ mod tests {
                 _ => unreachable!("all cases should be covered"),
             }
         }
+    }
+
+    #[test]
+    fn map_jsonrpc_error_prefers_structured_error_info() {
+        let mapped = map_jsonrpc_error(JsonRpcError {
+            code: TASK_NOT_FOUND,
+            message: "fallback message".to_owned(),
+            data: Some(serde_json::json!({
+                "@type": "type.googleapis.com/google.rpc.ErrorInfo",
+                "reason": "TASK_NOT_FOUND",
+                "domain": "a2a-protocol.org",
+                "metadata": {
+                    "taskId": "task-123"
+                }
+            })),
+        });
+
+        assert!(matches!(mapped, A2AError::TaskNotFound(value) if value == "task-123"));
     }
 }

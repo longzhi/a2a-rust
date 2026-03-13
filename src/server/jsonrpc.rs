@@ -3,7 +3,7 @@ use std::sync::Arc;
 use axum::Json;
 use axum::body::Bytes;
 use axum::extract::State;
-use axum::http::StatusCode;
+use axum::http::{HeaderMap, StatusCode};
 
 use crate::A2AError;
 use crate::jsonrpc::{
@@ -24,6 +24,7 @@ use super::handler::A2AHandler;
 
 pub(super) async fn handle<H>(
     State(handler): State<Arc<H>>,
+    headers: HeaderMap,
     body: Bytes,
 ) -> (StatusCode, Json<JsonRpcResponse>)
 where
@@ -55,6 +56,10 @@ where
     }
 
     let id = request.id.clone();
+    if let Err(error) = handler.validate_protocol_headers(&headers).await {
+        return (StatusCode::OK, Json(error_response(id, error)));
+    }
+
     let result = match request.method.as_str() {
         METHOD_SEND_MESSAGE => parse_params::<SendMessageRequest>(request.params)
             .and_then(|params| params.validate().map(|_| params))
