@@ -5,172 +5,272 @@
 [![docs.rs](https://docs.rs/a2a-rust/badge.svg)](https://docs.rs/a2a-rust)
 [![License](https://img.shields.io/crates/l/a2a-rust.svg)](LICENSE-MIT)
 
-A Rust SDK for the [Google A2A (Agent-to-Agent)](https://a2a-protocol.org/) protocol. Provides complete type definitions, a server framework, and a client library for building A2A-compatible agents.
+Rust SDK for A2A Protocol v1.0 RC.
 
-**First Rust A2A SDK. First v1.0 implementation in any language.**
+`a2a-rust` provides:
+
+- a proto-aligned type layer
+- an axum-based server with REST, JSON-RPC, and SSE
+- a reqwest-based client with discovery, dual transport, and SSE parsing
+- a pluggable `TaskStore` plus `InMemoryTaskStore`
+
+This crate has zero Clawhive-specific logic.
+
+## Status
+
+- Protocol lock: `v1.0.0-rc`
+- Proto package: `a2a.v1`
+- Implemented transports: `JSONRPC`, `HTTP+JSON`
+- Out of scope: gRPC
+
+The tagged proto is the source of truth. The repo-local implementation contract is [docs/proto-first-design.md](docs/proto-first-design.md).
 
 ## Features
 
-- **Complete type system** — All A2A v1.0 RC types (AgentCard, Task, Message, Part, SecurityScheme, etc.) with serde serialization
-- **Server framework** — axum-based router supporting both REST and JSON-RPC 2.0 bindings, with SSE streaming
-- **Client library** — AgentCard discovery with caching, and full A2A client (send, get, cancel, list, subscribe)
-- **TaskStore trait** — Pluggable task persistence with built-in `InMemoryTaskStore` (TTL + LRU eviction)
-- **Protocol compliant** — Strict alignment with A2A v1.0 RC spec (tag `v1.0.0-rc`, commit `6292104`)
-- **Feature-gated** — `server` and `client` features can be enabled independently
+| Feature | Default | Purpose |
+|---|---|---|
+| `server` | Yes | Router, handlers, SSE, and `TaskStore` support |
+| `client` | Yes | Discovery, dual transport client, and SSE parsing |
 
-## Quick Start
-
-Add to your `Cargo.toml`:
-
-```toml
-[dependencies]
-a2a-rust = "0.1"
-```
-
-### Build an A2A Server
-
-Implement the `A2AHandler` trait and mount the router:
-
-```rust
-use a2a_rust::server::{A2AHandler, router};
-use a2a_rust::types::*;
-
-struct EchoAgent;
-
-#[async_trait::async_trait]
-impl A2AHandler for EchoAgent {
-    async fn get_agent_card(&self) -> Result<AgentCard, a2a_rust::A2AError> {
-        // Return your agent's card
-        todo!()
-    }
-
-    async fn handle_send_message(
-        &self,
-        req: SendMessageRequest,
-    ) -> Result<SendMessageResponse, a2a_rust::A2AError> {
-        // Process the message and return a Task or Message
-        todo!()
-    }
-
-    // ... implement other required methods
-}
-
-#[tokio::main]
-async fn main() {
-    let app = router(EchoAgent);
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
-    axum::serve(listener, app).await.unwrap();
-}
-```
-
-Your agent is now discoverable at `GET /.well-known/agent-card.json` and accepts requests via both REST and JSON-RPC endpoints.
-
-### Use the A2A Client
-
-```rust
-use a2a_rust::client::A2AClient;
-use a2a_rust::types::*;
-
-#[tokio::main]
-async fn main() -> Result<(), a2a_rust::A2AError> {
-    let client = A2AClient::new();
-
-    // Discover an agent
-    let card = client.discover("https://agent.example.com").await?;
-    println!("Agent: {} — {}", card.name, card.description);
-
-    // Send a message
-    let response = client.send_message("https://agent.example.com", request).await?;
-    Ok(())
-}
-```
-
-## Protocol Bindings
-
-A2A v1.0 RC defines three protocol bindings. This crate implements JSON-RPC and REST:
-
-| Binding | Endpoint | Status |
-|---------|----------|--------|
-| **JSON-RPC 2.0** | `POST /jsonrpc` | Implemented |
-| **REST (HTTP+JSON)** | Multiple endpoints | Implemented |
-| **gRPC** | protobuf service | Not yet (structure reserved) |
-
-### REST Endpoints
-
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/.well-known/agent-card.json` | Agent discovery |
-| POST | `/message:send` | Send message |
-| POST | `/message:stream` | Send message (SSE streaming) |
-| GET | `/tasks/{id}` | Get task |
-| GET | `/tasks` | List tasks (cursor pagination) |
-| POST | `/tasks/{id}:cancel` | Cancel task |
-| GET | `/tasks/{id}:subscribe` | Subscribe to task (SSE) |
-| GET | `/extendedAgentCard` | Extended agent card (authenticated) |
-
-### JSON-RPC Methods
-
-| Method | Description |
-|--------|-------------|
-| `message/send` | Send message, returns Task or Message |
-| `message/stream` | Send message with SSE streaming |
-| `tasks/get` | Get task by ID |
-| `tasks/list` | List tasks with cursor pagination |
-| `tasks/cancel` | Cancel a task |
-| `tasks/subscribe` | Subscribe to existing task (SSE) |
-| `agent/getExtendedCard` | Get extended agent card |
-
-## Project Structure
-
-```
-src/
-├── lib.rs               # Public API re-exports
-├── types/
-│   ├── agent_card.rs    # AgentCard, AgentSkill, AgentCapabilities
-│   ├── task.rs          # Task, TaskState, TaskStatus
-│   ├── message.rs       # Message, Part (unified), Artifact
-│   ├── streaming.rs     # StreamResponse, SSE event types
-│   ├── security.rs      # SecurityScheme (5 variants), SecurityRequirement
-│   └── jsonrpc.rs       # JSON-RPC 2.0 Request/Response/Error
-├── server/
-│   ├── handler.rs       # A2AHandler trait (implement this)
-│   ├── router.rs        # axum Router builder
-│   ├── rest.rs          # REST endpoint handlers
-│   ├── jsonrpc.rs       # JSON-RPC 2.0 dispatcher
-│   └── streaming.rs     # SSE streaming
-├── client/
-│   ├── discovery.rs     # AgentCard discovery + caching
-│   └── client.rs        # A2AClient
-└── error.rs             # A2AError type
-```
-
-## Feature Flags
-
-| Feature | Default | Description |
-|---------|---------|-------------|
-| `server` | Yes | A2A server framework (axum-based) |
-| `client` | Yes | A2A HTTP client (reqwest-based) |
-
-To use only the types:
+Types-only usage:
 
 ```toml
 [dependencies]
 a2a-rust = { version = "0.1", default-features = false }
 ```
 
-## Protocol Version
+## Quick Start
 
-This crate strictly targets **A2A Protocol v1.0 RC** (git tag `v1.0.0-rc`, commit `6292104`, 2026-01-29). Key differences from v0.3.0:
+Add the crate:
 
-- `Part` is a unified flat struct (not tagged enum)
-- `AgentCard.url` removed — replaced by `supported_interfaces: Vec<AgentInterface>`
-- Enum values use `SCREAMING_SNAKE_CASE` (e.g., `TASK_STATE_COMPLETED`)
-- REST endpoints changed (e.g., `POST /message:send` instead of `POST /tasks/send`)
-- JSON-RPC methods renamed (e.g., `message/send` instead of `tasks/send`)
-- Well-known path: `agent-card.json` (was `agent.json`)
-- TaskState has 9 states including `REJECTED` and `AUTH_REQUIRED`
+```toml
+[dependencies]
+a2a-rust = "0.1"
+```
 
-See [What's New in V1](https://a2a-protocol.org/latest/whats-new-v1/) for the full changelog.
+### Server
+
+Implement `A2AHandler` and mount the router:
+
+```rust
+use a2a_rust::server::{A2AHandler, router};
+use a2a_rust::types::{
+    AgentCapabilities, AgentCard, AgentInterface, Message, Part, Role, SendMessageRequest,
+    SendMessageResponse,
+};
+use a2a_rust::A2AError;
+
+#[derive(Clone)]
+struct EchoAgent;
+
+#[async_trait::async_trait]
+impl A2AHandler for EchoAgent {
+    async fn get_agent_card(&self) -> Result<AgentCard, A2AError> {
+        Ok(AgentCard {
+            name: "Echo Agent".to_owned(),
+            description: "Replies with the same text".to_owned(),
+            supported_interfaces: vec![
+                AgentInterface {
+                    url: "/rpc".to_owned(),
+                    protocol_binding: "JSONRPC".to_owned(),
+                    tenant: None,
+                    protocol_version: "1.0".to_owned(),
+                },
+                AgentInterface {
+                    url: "/".to_owned(),
+                    protocol_binding: "HTTP+JSON".to_owned(),
+                    tenant: None,
+                    protocol_version: "1.0".to_owned(),
+                },
+            ],
+            provider: None,
+            version: "0.1.0".to_owned(),
+            documentation_url: None,
+            capabilities: AgentCapabilities {
+                streaming: Some(false),
+                push_notifications: Some(false),
+                extensions: Vec::new(),
+                extended_agent_card: Some(false),
+            },
+            security_schemes: Default::default(),
+            security_requirements: Vec::new(),
+            default_input_modes: vec!["text/plain".to_owned()],
+            default_output_modes: vec!["text/plain".to_owned()],
+            skills: Vec::new(),
+            signatures: Vec::new(),
+            icon_url: None,
+        })
+    }
+
+    async fn send_message(
+        &self,
+        request: SendMessageRequest,
+    ) -> Result<SendMessageResponse, A2AError> {
+        Ok(SendMessageResponse::Message(Message {
+            message_id: "msg-echo-1".to_owned(),
+            context_id: request.message.context_id,
+            task_id: None,
+            role: Role::Agent,
+            parts: vec![Part {
+                text: Some("pong".to_owned()),
+                raw: None,
+                url: None,
+                data: None,
+                metadata: None,
+                filename: None,
+                media_type: None,
+            }],
+            metadata: None,
+            extensions: Vec::new(),
+            reference_task_ids: Vec::new(),
+        }))
+    }
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:3000").await?;
+    axum::serve(listener, router(EchoAgent)).await?;
+    Ok(())
+}
+```
+
+Runnable example:
+
+```bash
+cargo run --example echo_server --features server
+```
+
+### Client
+
+Use discovery and send a message:
+
+```rust
+use a2a_rust::client::A2AClient;
+use a2a_rust::types::{Message, Part, Role, SendMessageRequest, SendMessageResponse};
+
+#[tokio::main]
+async fn main() -> Result<(), a2a_rust::A2AError> {
+    let client = A2AClient::new("http://127.0.0.1:3000")?;
+    let card = client.discover_agent_card().await?;
+
+    let response = client
+        .send_message(SendMessageRequest {
+            message: Message {
+                message_id: "msg-1".to_owned(),
+                context_id: Some("ctx-1".to_owned()),
+                task_id: None,
+                role: Role::User,
+                parts: vec![Part {
+                    text: Some("ping".to_owned()),
+                    raw: None,
+                    url: None,
+                    data: None,
+                    metadata: None,
+                    filename: None,
+                    media_type: None,
+                }],
+                metadata: None,
+                extensions: Vec::new(),
+                reference_task_ids: Vec::new(),
+            },
+            configuration: None,
+            metadata: None,
+            tenant: None,
+        })
+        .await?;
+
+    println!("agent: {}", card.name);
+    match response {
+        SendMessageResponse::Message(message) => {
+            println!("reply: {:?}", message.parts[0].text);
+        }
+        SendMessageResponse::Task(task) => {
+            println!("task: {}", task.id);
+        }
+    }
+
+    Ok(())
+}
+```
+
+Runnable example:
+
+```bash
+cargo run --example ping_client --features client
+```
+
+## Protocol Surface
+
+### Discovery
+
+- `GET /.well-known/agent-card.json`
+
+### JSON-RPC
+
+- server default endpoint: `POST /rpc`
+- compatibility alias: `POST /jsonrpc`
+- method names use PascalCase v1.0 RC bindings such as `SendMessage`, `GetTask`, and `ListTasks`
+
+### REST
+
+Canonical REST endpoints include:
+
+- `POST /message:send`
+- `POST /message:stream`
+- `GET /tasks`
+- `GET /tasks/{id}`
+- `POST /tasks/{id}:cancel`
+- `GET /tasks/{id}:subscribe`
+- `POST /tasks/{task_id}/pushNotificationConfigs`
+- `GET /tasks/{task_id}/pushNotificationConfigs/{id}`
+- `GET /tasks/{task_id}/pushNotificationConfigs`
+- `DELETE /tasks/{task_id}/pushNotificationConfigs/{id}`
+- `GET /extendedAgentCard`
+
+Tenant-prefixed variants are also supported.
+
+## Client Behavior
+
+- Discovery caches agent cards with a configurable TTL
+- Transport selection follows the server-declared `supported_interfaces` order
+- Supported transports: `JSONRPC`, `HTTP+JSON`
+- Streaming uses SSE and parses both `\n\n` and `\r\n\r\n` frame delimiters
+- `A2A-Version: 1.0` is always sent
+
+## Project Layout
+
+```text
+src/
+  lib.rs
+  error.rs
+  jsonrpc.rs
+  store.rs
+  types/
+  server/
+  client/
+examples/
+  echo_server.rs
+  ping_client.rs
+tests/
+  server_integration.rs
+  client_integration.rs
+  client_wiremock.rs
+```
+
+## Development
+
+Core checks:
+
+```bash
+cargo fmt --all -- --check
+cargo clippy --all-targets --all-features -- -D warnings
+cargo clippy --all-targets --no-default-features -- -D warnings
+cargo test --all-features
+cargo test --no-default-features
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for contributor workflow details.
 
 ## References
 
@@ -180,13 +280,9 @@ See [What's New in V1](https://a2a-protocol.org/latest/whats-new-v1/) for the fu
 
 ## License
 
-Licensed under either of
+Licensed under either of:
 
-- Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE) or <http://www.apache.org/licenses/LICENSE-2.0>)
-- MIT License ([LICENSE-MIT](LICENSE-MIT) or <http://opensource.org/licenses/MIT>)
+- Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE))
+- MIT License ([LICENSE-MIT](LICENSE-MIT))
 
 at your option.
-
-### Contribution
-
-Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in the work by you, as defined in the Apache-2.0 license, shall be dual licensed as above, without any additional terms or conditions.

@@ -20,16 +20,25 @@ Be respectful, inclusive, and constructive. We're all here to build a great A2A 
 - Rust 1.75+ (install via [rustup](https://rustup.rs/))
 - Git
 
+Install local git hooks after cloning:
+
+```bash
+just install-hooks
+```
+
 ### Build & Test
 
 ```bash
 cargo build
 cargo test
+cargo test --no-default-features
 cargo clippy --all-targets --all-features -- -D warnings
+cargo clippy --all-targets --no-default-features -- -D warnings
 cargo fmt --all
+cargo check --all-features --examples
 ```
 
-All four must pass before submitting a PR. CI treats all warnings as errors.
+These checks must pass before submitting a PR. CI treats all warnings as errors.
 
 ### Feature Flags
 
@@ -98,6 +107,8 @@ test(serde): add round-trip tests for SecurityScheme variants
 docs(readme): add SSE streaming example
 ```
 
+Local hooks enforce this commit message format and run checks on `git commit` and `git push`.
+
 ## Pull Request Process
 
 1. **Update your branch** with the latest upstream changes:
@@ -153,10 +164,15 @@ Use `wiremock` to mock A2A servers:
 
 ```rust
 let mock_server = MockServer::start().await;
-Mock::given(method("POST")).and(path("/jsonrpc"))
+Mock::given(method("POST")).and(path("/rpc"))
     .respond_with(ResponseTemplate::new(200).set_body_json(/* ... */))
     .mount(&mock_server).await;
 ```
+
+There are two client test styles in this repo:
+
+- `tests/client_integration.rs` for end-to-end behavior against the local axum server
+- `tests/client_wiremock.rs` for client-only transport and wire-shape tests
 
 ## Questions?
 
