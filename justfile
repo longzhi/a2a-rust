@@ -38,7 +38,9 @@ release version:
   [[ $REPLY =~ ^[Yy]$ ]] || exit 1
   sed -i '' 's/^version = ".*"/version = "{{version}}"/' Cargo.toml
   cargo check --all-features
-  git add Cargo.toml
-  git commit -m "chore: release v{{version}}"
+  if ! git diff --quiet Cargo.toml; then
+    git add Cargo.toml
+    git commit -m "chore: release v{{version}}"
+  fi
   git tag "v{{version}}"
   echo "Done. Run 'git push origin main v{{version}}' to publish."
