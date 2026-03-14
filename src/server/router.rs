@@ -44,12 +44,12 @@ where
         .route(
             "/tasks/{task_id}/pushNotificationConfigs",
             post(rest::create_task_push_notification_config::<H>)
-                .get(rest::list_task_push_notification_config::<H>),
+                .get(rest::list_task_push_notification_configs::<H>),
         )
         .route(
             "/{tenant}/tasks/{task_id}/pushNotificationConfigs",
             post(rest::tenant_create_task_push_notification_config::<H>)
-                .get(rest::tenant_list_task_push_notification_config::<H>),
+                .get(rest::tenant_list_task_push_notification_configs::<H>),
         )
         .route(
             "/tasks/{task_id}/pushNotificationConfigs/{id}",

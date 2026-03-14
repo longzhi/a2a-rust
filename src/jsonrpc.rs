@@ -52,8 +52,8 @@ pub const METHOD_SUBSCRIBE_TO_TASK: &str = "SubscribeToTask";
 pub const METHOD_CREATE_TASK_PUSH_NOTIFICATION_CONFIG: &str = "CreateTaskPushNotificationConfig";
 /// JSON-RPC method name for `GetTaskPushNotificationConfig`.
 pub const METHOD_GET_TASK_PUSH_NOTIFICATION_CONFIG: &str = "GetTaskPushNotificationConfig";
-/// JSON-RPC method name for `ListTaskPushNotificationConfig`.
-pub const METHOD_LIST_TASK_PUSH_NOTIFICATION_CONFIG: &str = "ListTaskPushNotificationConfig";
+/// JSON-RPC method name for `ListTaskPushNotificationConfigs`.
+pub const METHOD_LIST_TASK_PUSH_NOTIFICATION_CONFIGS: &str = "ListTaskPushNotificationConfigs";
 /// JSON-RPC method name for `DeleteTaskPushNotificationConfig`.
 pub const METHOD_DELETE_TASK_PUSH_NOTIFICATION_CONFIG: &str = "DeleteTaskPushNotificationConfig";
 /// JSON-RPC method name for `GetExtendedAgentCard`.

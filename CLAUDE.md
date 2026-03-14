@@ -5,8 +5,8 @@ Read `AGENTS.md` first.
 ## Quick Reference
 
 - Language: Rust, edition 2024
-- Protocol: A2A v1.0 RC, locked to tag `v1.0.0-rc`
-- Proto package: `a2a.v1`
+- Protocol: A2A v1.0, locked to tag `v1.0.0`
+- Proto package: `lf.a2a.v1`
 - Current implemented surface: `types`, `error`, `jsonrpc`, `server`, `client`, `store`
 - Remaining work: docs, examples, release polish
 - Zero Clawhive dependency

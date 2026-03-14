@@ -118,7 +118,7 @@ fn send_message_response_deserializes_proto_first_input_required_example() {
     match response {
         SendMessageResponse::Task(task) => {
             assert_eq!(task.id, "task-123");
-            assert_eq!(task.context_id, "ctx-123");
+            assert_eq!(task.context_id.as_deref(), Some("ctx-123"));
             assert_eq!(task.status.state, TaskState::InputRequired);
         }
         SendMessageResponse::Message(_) => panic!("expected task response"),

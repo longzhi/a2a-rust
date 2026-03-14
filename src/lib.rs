@@ -1,4 +1,4 @@
-//! Rust SDK for the A2A Protocol v1.0 RC.
+//! Rust SDK for the A2A Protocol v1.0.
 //!
 //! This crate provides a protocol-accurate type layer plus optional server and
 //! client implementations behind feature flags.

@@ -10,8 +10,9 @@ use super::message::{Artifact, Message};
 pub struct Task {
     /// Unique task identifier.
     pub id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     /// Context identifier shared with related messages and updates.
-    pub context_id: String,
+    pub context_id: Option<String>,
     /// Current task status.
     pub status: TaskStatus,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -88,7 +89,7 @@ mod tests {
     fn task_round_trip_serialization() {
         let task = Task {
             id: "task-1".to_owned(),
-            context_id: "ctx-1".to_owned(),
+            context_id: Some("ctx-1".to_owned()),
             status: TaskStatus {
                 state: TaskState::Completed,
                 message: Some(Message {
@@ -120,7 +121,7 @@ mod tests {
         let round_trip: Task = serde_json::from_str(&json).expect("task should deserialize");
 
         assert_eq!(round_trip.id, "task-1");
-        assert_eq!(round_trip.context_id, "ctx-1");
+        assert_eq!(round_trip.context_id.as_deref(), Some("ctx-1"));
         assert_eq!(round_trip.status.state, TaskState::Completed);
     }
 }

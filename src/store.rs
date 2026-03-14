@@ -195,7 +195,7 @@ fn enforce_capacity(tasks: &mut BTreeMap<String, StoredTask>, max_entries: Optio
 
 fn task_matches(task: &Task, req: &ListTasksRequest) -> bool {
     if let Some(context_id) = &req.context_id
-        && &task.context_id != context_id
+        && task.context_id.as_deref() != Some(context_id.as_str())
     {
         return false;
     }
@@ -260,7 +260,7 @@ mod tests {
         store
             .put(&Task {
                 id: "task-1".to_owned(),
-                context_id: "ctx-1".to_owned(),
+                context_id: Some("ctx-1".to_owned()),
                 status: TaskStatus {
                     state: TaskState::Submitted,
                     message: None,
@@ -276,7 +276,7 @@ mod tests {
         store
             .put(&Task {
                 id: "task-2".to_owned(),
-                context_id: "ctx-1".to_owned(),
+                context_id: Some("ctx-1".to_owned()),
                 status: TaskStatus {
                     state: TaskState::Working,
                     message: None,
@@ -316,7 +316,7 @@ mod tests {
         store
             .put(&Task {
                 id: "task-1".to_owned(),
-                context_id: "ctx-1".to_owned(),
+                context_id: Some("ctx-1".to_owned()),
                 status: TaskStatus {
                     state: TaskState::Completed,
                     message: None,
@@ -373,7 +373,7 @@ mod tests {
         store
             .put(&Task {
                 id: "task-1".to_owned(),
-                context_id: "ctx-1".to_owned(),
+                context_id: Some("ctx-1".to_owned()),
                 status: TaskStatus {
                     state: TaskState::Submitted,
                     message: None,
@@ -402,7 +402,7 @@ mod tests {
         store
             .put(&Task {
                 id: "task-1".to_owned(),
-                context_id: "ctx-1".to_owned(),
+                context_id: Some("ctx-1".to_owned()),
                 status: TaskStatus {
                     state: TaskState::Submitted,
                     message: None,
@@ -419,7 +419,7 @@ mod tests {
         store
             .put(&Task {
                 id: "task-2".to_owned(),
-                context_id: "ctx-2".to_owned(),
+                context_id: Some("ctx-2".to_owned()),
                 status: TaskStatus {
                     state: TaskState::Working,
                     message: None,
@@ -445,7 +445,7 @@ mod tests {
         store
             .put(&Task {
                 id: "task-3".to_owned(),
-                context_id: "ctx-3".to_owned(),
+                context_id: Some("ctx-3".to_owned()),
                 status: TaskStatus {
                     state: TaskState::Completed,
                     message: None,
@@ -497,7 +497,7 @@ mod tests {
                 store
                     .put(&Task {
                         id: task_id.clone(),
-                        context_id: "ctx-1".to_owned(),
+                        context_id: Some("ctx-1".to_owned()),
                         status: TaskStatus {
                             state: TaskState::Working,
                             message: None,

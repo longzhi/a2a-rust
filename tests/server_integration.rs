@@ -87,7 +87,7 @@ impl A2AHandler for TestHandler {
     async fn get_task(&self, request: GetTaskRequest) -> Result<Task, A2AError> {
         Ok(Task {
             id: request.id,
-            context_id: "ctx-1".to_owned(),
+            context_id: Some("ctx-1".to_owned()),
             status: TaskStatus {
                 state: TaskState::Working,
                 message: None,
@@ -103,7 +103,7 @@ impl A2AHandler for TestHandler {
         Ok(ListTasksResponse {
             tasks: vec![Task {
                 id: "task-1".to_owned(),
-                context_id: "ctx-1".to_owned(),
+                context_id: Some("ctx-1".to_owned()),
                 status: TaskStatus {
                     state: TaskState::Submitted,
                     message: None,
@@ -191,7 +191,7 @@ impl A2AHandler for StreamingHandler {
         Ok(Box::pin(stream::iter(vec![
             StreamResponse::Task(Task {
                 id: request.id.clone(),
-                context_id: "ctx-1".to_owned(),
+                context_id: Some("ctx-1".to_owned()),
                 status: TaskStatus {
                     state: TaskState::Working,
                     message: None,
@@ -299,7 +299,7 @@ impl A2AHandler for TenantEchoHandler {
     async fn get_task(&self, request: GetTaskRequest) -> Result<Task, A2AError> {
         Ok(Task {
             id: request.id,
-            context_id: "ctx-tenant".to_owned(),
+            context_id: Some("ctx-tenant".to_owned()),
             status: TaskStatus {
                 state: TaskState::Working,
                 message: None,
@@ -315,7 +315,7 @@ impl A2AHandler for TenantEchoHandler {
         Ok(ListTasksResponse {
             tasks: vec![Task {
                 id: "tenant-task-1".to_owned(),
-                context_id: "ctx-tenant".to_owned(),
+                context_id: Some("ctx-tenant".to_owned()),
                 status: TaskStatus {
                     state: TaskState::Submitted,
                     message: None,
@@ -337,7 +337,7 @@ impl A2AHandler for TenantEchoHandler {
     ) -> Result<A2AStream, A2AError> {
         Ok(Box::pin(stream::iter(vec![StreamResponse::Task(Task {
             id: request.id,
-            context_id: "ctx-tenant".to_owned(),
+            context_id: Some("ctx-tenant".to_owned()),
             status: TaskStatus {
                 state: TaskState::Working,
                 message: None,
@@ -349,21 +349,18 @@ impl A2AHandler for TenantEchoHandler {
         })])))
     }
 
-    async fn list_task_push_notification_config(
+    async fn list_task_push_notification_configs(
         &self,
-        request: a2a_rust::types::ListTaskPushNotificationConfigRequest,
-    ) -> Result<a2a_rust::types::ListTaskPushNotificationConfigResponse, A2AError> {
-        Ok(a2a_rust::types::ListTaskPushNotificationConfigResponse {
+        request: a2a_rust::types::ListTaskPushNotificationConfigsRequest,
+    ) -> Result<a2a_rust::types::ListTaskPushNotificationConfigsResponse, A2AError> {
+        Ok(a2a_rust::types::ListTaskPushNotificationConfigsResponse {
             configs: vec![a2a_rust::types::TaskPushNotificationConfig {
                 id: "cfg-1".to_owned(),
                 task_id: request.task_id,
-                push_notification_config: a2a_rust::types::PushNotificationConfig {
-                    id: Some("cfg-1".to_owned()),
-                    url: "https://example.com/push".to_owned(),
-                    token: None,
-                    authentication: None,
-                },
                 tenant: request.tenant,
+                url: "https://example.com/push".to_owned(),
+                token: None,
+                authentication: None,
             }],
             next_page_token: String::new(),
         })
@@ -376,13 +373,10 @@ impl A2AHandler for TenantEchoHandler {
         Ok(a2a_rust::types::TaskPushNotificationConfig {
             id: request.id,
             task_id: request.task_id,
-            push_notification_config: a2a_rust::types::PushNotificationConfig {
-                id: Some("cfg-1".to_owned()),
-                url: "https://example.com/push".to_owned(),
-                token: None,
-                authentication: None,
-            },
             tenant: request.tenant,
+            url: "https://example.com/push".to_owned(),
+            token: None,
+            authentication: None,
         })
     }
 
@@ -1010,7 +1004,7 @@ async fn jsonrpc_push_config_returns_not_supported_when_capability_is_disabled()
     let body = serde_json::json!({
         "jsonrpc": "2.0",
         "id": "req-4",
-        "method": "ListTaskPushNotificationConfig",
+        "method": "ListTaskPushNotificationConfigs",
         "params": {
             "taskId": "task-1"
         }

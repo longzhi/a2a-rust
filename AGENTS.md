@@ -4,7 +4,7 @@ This file provides guidance to AI coding agents working in this repository.
 
 ## Project Overview
 
-`a2a-rust` is a generic Rust SDK for A2A (Agent-to-Agent) Protocol v1.0 RC.
+`a2a-rust` is a generic Rust SDK for A2A (Agent-to-Agent) Protocol v1.0.
 
 Current implementation status:
 
@@ -17,9 +17,9 @@ This crate has zero Clawhive-specific logic. Keep it generic and protocol-focuse
 
 Protocol lock:
 
-- tag: `v1.0.0-rc`
-- commit: `6292104`
-- proto package: `a2a.v1`
+- tag: `v1.0.0`
+- commit: `1736957`
+- proto package: `lf.a2a.v1`
 
 Normative source precedence:
 
@@ -131,7 +131,7 @@ Use proto enum strings exactly, for example:
 
 ### JSON-RPC method names
 
-Use PascalCase v1.0 RC method names, for example:
+Use PascalCase v1.0 method names, for example:
 
 - `SendMessage`
 - `GetTask`
@@ -161,7 +161,7 @@ Important:
 - the field is `location`, not OpenAPI's `in`
 - `OAuthFlows` is modeled as a oneof-style enum
 - deserialization also accepts the Python SDK `type`-discriminator shape for interop
-- deprecated OAuth flows still exist in the tagged proto and remain part of the wire model
+- deprecated OAuth flows still exist in the published v1.0 definitions and remain part of the wire model
 
 ### AgentId
 
@@ -184,10 +184,12 @@ for the repository's `TASK_STATE_AUTH_REQUIRED` metadata convention:
 
 ### Required shape corrections already reflected in code
 
-- `Task.context_id` is required
+- `Task.context_id` is optional
 - `TaskStatusUpdateEvent.context_id` is required
 - `TaskArtifactUpdateEvent.context_id` is required
-- `ListTaskPushNotificationConfigResponse.next_page_token` is a string, with empty string meaning no next page
+- `ListTaskPushNotificationConfigsResponse.next_page_token` is a string, with empty string meaning no next page
+- `TaskPushNotificationConfig` is a flattened object with `url`, `token`, and `authentication`
+- `SendMessageConfiguration` uses `return_immediately` and `task_push_notification_config`
 
 ### Error codes
 
@@ -225,6 +227,6 @@ Prefer:
 ## References
 
 - [Proto-first design](docs/proto-first-design.md)
-- [A2A Protocol Spec v1.0 RC](https://a2a-protocol.org/latest/specification/)
-- [A2A Proto v1.0.0-rc](https://github.com/a2aproject/A2A/blob/v1.0.0-rc/specification/a2a.proto)
+- [A2A Protocol Spec v1.0](https://a2a-protocol.org/latest/specification/)
+- [A2A Proto v1.0.0](https://github.com/a2aproject/A2A/blob/v1.0.0/specification/a2a.proto)
 - [JSON-RPC 2.0 Spec](https://www.jsonrpc.org/specification)

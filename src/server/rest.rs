@@ -9,12 +9,11 @@ use serde::Deserialize;
 use crate::A2AError;
 use crate::error::ProblemDetails;
 use crate::types::{
-    AgentCard, CancelTaskRequest, CreateTaskPushNotificationConfigRequest,
-    DeleteTaskPushNotificationConfigRequest, GetExtendedAgentCardRequest,
-    GetTaskPushNotificationConfigRequest, GetTaskRequest, ListTaskPushNotificationConfigRequest,
-    ListTaskPushNotificationConfigResponse, ListTasksRequest, ListTasksResponse,
-    PushNotificationConfig, SendMessageRequest, SendMessageResponse, SubscribeToTaskRequest, Task,
-    TaskPushNotificationConfig,
+    AgentCard, CancelTaskRequest, DeleteTaskPushNotificationConfigRequest,
+    GetExtendedAgentCardRequest, GetTaskPushNotificationConfigRequest, GetTaskRequest,
+    ListTaskPushNotificationConfigsRequest, ListTaskPushNotificationConfigsResponse,
+    ListTasksRequest, ListTasksResponse, SendMessageRequest, SendMessageResponse,
+    SubscribeToTaskRequest, Task, TaskPushNotificationConfig,
 };
 
 use super::handler::A2AHandler;
@@ -216,6 +215,7 @@ pub(super) async fn cancel_task<H>(
     headers: HeaderMap,
     Path(id): Path<String>,
     Query(query): Query<TenantQuery>,
+    body: Option<Json<CancelTaskBody>>,
 ) -> Result<Json<Task>, RestErrorResponse>
 where
     H: A2AHandler,
@@ -231,6 +231,7 @@ where
         .cancel_task(CancelTaskRequest {
             id: id.to_owned(),
             tenant: query.tenant,
+            metadata: body.and_then(|body| body.metadata.clone()),
         })
         .await
         .map(Json)
@@ -242,6 +243,7 @@ pub(super) async fn tenant_cancel_task<H>(
     headers: HeaderMap,
     Path((tenant, id)): Path<(String, String)>,
     Query(mut query): Query<TenantQuery>,
+    body: Option<Json<CancelTaskBody>>,
 ) -> Result<Json<Task>, RestErrorResponse>
 where
     H: A2AHandler,
@@ -257,6 +259,7 @@ where
         .cancel_task(CancelTaskRequest {
             id: id.to_owned(),
             tenant: query.tenant,
+            metadata: body.and_then(|body| body.metadata.clone()),
         })
         .await
         .map(Json)
@@ -308,8 +311,8 @@ pub(super) async fn create_task_push_notification_config<H>(
     State(handler): State<Arc<H>>,
     headers: HeaderMap,
     Path(task_id): Path<String>,
-    Query(query): Query<CreateTaskPushNotificationConfigQuery>,
-    Json(config): Json<PushNotificationConfig>,
+    Query(query): Query<TenantQuery>,
+    Json(mut config): Json<TaskPushNotificationConfig>,
 ) -> Result<Json<TaskPushNotificationConfig>, RestErrorResponse>
 where
     H: A2AHandler,
@@ -317,13 +320,11 @@ where
     handler.validate_protocol_headers(&headers).await?;
     reject_query_tenant(&query.tenant)?;
 
+    config.task_id = task_id;
+    config.tenant = query.tenant;
+
     handler
-        .create_task_push_notification_config(CreateTaskPushNotificationConfigRequest {
-            task_id,
-            config_id: query.config_id,
-            config,
-            tenant: query.tenant,
-        })
+        .create_task_push_notification_config(config)
         .await
         .map(Json)
         .map_err(rest_error)
@@ -333,22 +334,18 @@ pub(super) async fn tenant_create_task_push_notification_config<H>(
     State(handler): State<Arc<H>>,
     headers: HeaderMap,
     Path((tenant, task_id)): Path<(String, String)>,
-    Query(mut query): Query<CreateTaskPushNotificationConfigQuery>,
-    Json(config): Json<PushNotificationConfig>,
+    Query(_query): Query<TenantQuery>,
+    Json(mut config): Json<TaskPushNotificationConfig>,
 ) -> Result<Json<TaskPushNotificationConfig>, RestErrorResponse>
 where
     H: A2AHandler,
 {
     handler.validate_protocol_headers(&headers).await?;
-    query.tenant = Some(tenant);
+    config.task_id = task_id;
+    config.tenant = Some(tenant);
 
     handler
-        .create_task_push_notification_config(CreateTaskPushNotificationConfigRequest {
-            task_id,
-            config_id: query.config_id,
-            config,
-            tenant: query.tenant,
-        })
+        .create_task_push_notification_config(config)
         .await
         .map(Json)
         .map_err(rest_error)
@@ -400,19 +397,19 @@ where
         .map_err(rest_error)
 }
 
-pub(super) async fn list_task_push_notification_config<H>(
+pub(super) async fn list_task_push_notification_configs<H>(
     State(handler): State<Arc<H>>,
     headers: HeaderMap,
     Path(task_id): Path<String>,
-    Query(query): Query<ListTaskPushNotificationConfigQuery>,
-) -> Result<Json<ListTaskPushNotificationConfigResponse>, RestErrorResponse>
+    Query(query): Query<ListTaskPushNotificationConfigsQuery>,
+) -> Result<Json<ListTaskPushNotificationConfigsResponse>, RestErrorResponse>
 where
     H: A2AHandler,
 {
     handler.validate_protocol_headers(&headers).await?;
     reject_query_tenant(&query.tenant)?;
 
-    let request = ListTaskPushNotificationConfigRequest {
+    let request = ListTaskPushNotificationConfigsRequest {
         task_id,
         page_size: query.page_size,
         page_token: query.page_token,
@@ -421,25 +418,25 @@ where
     request.validate()?;
 
     handler
-        .list_task_push_notification_config(request)
+        .list_task_push_notification_configs(request)
         .await
         .map(Json)
         .map_err(rest_error)
 }
 
-pub(super) async fn tenant_list_task_push_notification_config<H>(
+pub(super) async fn tenant_list_task_push_notification_configs<H>(
     State(handler): State<Arc<H>>,
     headers: HeaderMap,
     Path((tenant, task_id)): Path<(String, String)>,
-    Query(mut query): Query<ListTaskPushNotificationConfigQuery>,
-) -> Result<Json<ListTaskPushNotificationConfigResponse>, RestErrorResponse>
+    Query(mut query): Query<ListTaskPushNotificationConfigsQuery>,
+) -> Result<Json<ListTaskPushNotificationConfigsResponse>, RestErrorResponse>
 where
     H: A2AHandler,
 {
     handler.validate_protocol_headers(&headers).await?;
     query.tenant = Some(tenant);
 
-    let request = ListTaskPushNotificationConfigRequest {
+    let request = ListTaskPushNotificationConfigsRequest {
         task_id,
         page_size: query.page_size,
         page_token: query.page_token,
@@ -448,7 +445,7 @@ where
     request.validate()?;
 
     handler
-        .list_task_push_notification_config(request)
+        .list_task_push_notification_configs(request)
         .await
         .map(Json)
         .map_err(rest_error)
@@ -509,17 +506,9 @@ pub(super) struct GetTaskQuery {
     pub history_length: Option<i32>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(super) struct CreateTaskPushNotificationConfigQuery {
-    pub config_id: String,
-    #[serde(default)]
-    pub tenant: Option<String>,
-}
-
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub(super) struct ListTaskPushNotificationConfigQuery {
+pub(super) struct ListTaskPushNotificationConfigsQuery {
     #[serde(default)]
     pub tenant: Option<String>,
     #[serde(default)]
@@ -533,6 +522,13 @@ pub(super) struct ListTaskPushNotificationConfigQuery {
 pub(super) struct TenantQuery {
     #[serde(default)]
     pub tenant: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct CancelTaskBody {
+    #[serde(default)]
+    pub metadata: Option<crate::types::JsonObject>,
 }
 
 pub(super) fn rest_error(error: A2AError) -> RestErrorResponse {

@@ -17,17 +17,16 @@ use crate::jsonrpc::{
     JsonRpcError, JsonRpcId, JsonRpcRequest, JsonRpcResponse, METHOD_CANCEL_TASK,
     METHOD_CREATE_TASK_PUSH_NOTIFICATION_CONFIG, METHOD_DELETE_TASK_PUSH_NOTIFICATION_CONFIG,
     METHOD_GET_EXTENDED_AGENT_CARD, METHOD_GET_TASK, METHOD_GET_TASK_PUSH_NOTIFICATION_CONFIG,
-    METHOD_LIST_TASK_PUSH_NOTIFICATION_CONFIG, METHOD_LIST_TASKS, METHOD_NOT_FOUND,
+    METHOD_LIST_TASK_PUSH_NOTIFICATION_CONFIGS, METHOD_LIST_TASKS, METHOD_NOT_FOUND,
     METHOD_SEND_MESSAGE, PARSE_ERROR, PROTOCOL_VERSION, PUSH_NOTIFICATION_NOT_SUPPORTED,
     TASK_NOT_CANCELABLE, TASK_NOT_FOUND, UNSUPPORTED_OPERATION, VERSION_NOT_SUPPORTED,
 };
 use crate::types::{
-    AgentCard, AgentInterface, CancelTaskRequest, CreateTaskPushNotificationConfigRequest,
-    DeleteTaskPushNotificationConfigRequest, GetExtendedAgentCardRequest,
-    GetTaskPushNotificationConfigRequest, GetTaskRequest, ListTaskPushNotificationConfigRequest,
-    ListTaskPushNotificationConfigResponse, ListTasksRequest, ListTasksResponse,
-    SendMessageRequest, SendMessageResponse, StreamResponse, SubscribeToTaskRequest, Task,
-    TaskPushNotificationConfig,
+    AgentCard, AgentInterface, CancelTaskRequest, DeleteTaskPushNotificationConfigRequest,
+    GetExtendedAgentCardRequest, GetTaskPushNotificationConfigRequest, GetTaskRequest,
+    ListTaskPushNotificationConfigsRequest, ListTaskPushNotificationConfigsResponse,
+    ListTasksRequest, ListTasksResponse, SendMessageRequest, SendMessageResponse, StreamResponse,
+    SubscribeToTaskRequest, Task, TaskPushNotificationConfig,
 };
 
 use super::discovery::{
@@ -237,12 +236,15 @@ impl A2AClient {
                     request.tenant.as_deref(),
                     &["tasks", &cancel_segment],
                 )?;
-                self.read_json_response(
-                    self.apply_protocol_headers(self.client.post(url))
-                        .send()
-                        .await?,
-                )
-                .await
+                let builder = self.apply_protocol_headers(self.client.post(url));
+                let builder = if let Some(metadata) = &request.metadata {
+                    builder.json(&CancelTaskBody {
+                        metadata: Some(metadata.clone()),
+                    })
+                } else {
+                    builder
+                };
+                self.read_json_response(builder.send().await?).await
             }
         }
     }
@@ -272,7 +274,7 @@ impl A2AClient {
     /// Create or replace a push-notification configuration for a task.
     pub async fn create_task_push_notification_config(
         &self,
-        request: CreateTaskPushNotificationConfigRequest,
+        request: TaskPushNotificationConfig,
     ) -> Result<TaskPushNotificationConfig, A2AError> {
         match self.transport().await? {
             TransportEndpoint::JsonRpc(url) => {
@@ -287,10 +289,7 @@ impl A2AClient {
                 )?;
                 self.read_json_response(
                     self.apply_protocol_headers(self.client.post(url))
-                        .query(&CreateTaskPushNotificationConfigQuery {
-                            config_id: request.config_id,
-                        })
-                        .json(&request.config)
+                        .json(&request)
                         .send()
                         .await?,
                 )
@@ -331,15 +330,15 @@ impl A2AClient {
     }
 
     /// List push-notification configurations for a task.
-    pub async fn list_task_push_notification_config(
+    pub async fn list_task_push_notification_configs(
         &self,
-        request: ListTaskPushNotificationConfigRequest,
-    ) -> Result<ListTaskPushNotificationConfigResponse, A2AError> {
+        request: ListTaskPushNotificationConfigsRequest,
+    ) -> Result<ListTaskPushNotificationConfigsResponse, A2AError> {
         request.validate()?;
 
         match self.transport().await? {
             TransportEndpoint::JsonRpc(url) => {
-                self.jsonrpc_call(&url, METHOD_LIST_TASK_PUSH_NOTIFICATION_CONFIG, &request)
+                self.jsonrpc_call(&url, METHOD_LIST_TASK_PUSH_NOTIFICATION_CONFIGS, &request)
                     .await
             }
             TransportEndpoint::HttpJson(base_url) => {
@@ -350,7 +349,7 @@ impl A2AClient {
                 )?;
                 self.read_json_response(
                     self.apply_protocol_headers(self.client.get(url))
-                        .query(&ListTaskPushNotificationConfigQuery {
+                        .query(&ListTaskPushNotificationConfigsQuery {
                             page_size: request.page_size,
                             page_token: request.page_token,
                         })
@@ -788,17 +787,18 @@ struct ListTasksQuery {
 
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
-struct CreateTaskPushNotificationConfigQuery {
-    config_id: String,
-}
-
-#[derive(serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-struct ListTaskPushNotificationConfigQuery {
+struct ListTaskPushNotificationConfigsQuery {
     #[serde(skip_serializing_if = "Option::is_none")]
     page_size: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     page_token: Option<String>,
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CancelTaskBody {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    metadata: Option<crate::types::JsonObject>,
 }
 
 #[derive(serde::Deserialize)]

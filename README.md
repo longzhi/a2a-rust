@@ -5,7 +5,7 @@
 [![docs.rs](https://docs.rs/a2a-rust/badge.svg)](https://docs.rs/a2a-rust)
 [![License](https://img.shields.io/crates/l/a2a-rust.svg)](LICENSE-MIT)
 
-Rust SDK for A2A Protocol v1.0 RC.
+Rust SDK for A2A Protocol v1.0.
 
 `a2a-rust` provides:
 
@@ -18,8 +18,8 @@ This crate has zero Clawhive-specific logic.
 
 ## Status
 
-- Protocol lock: `v1.0.0-rc`
-- Proto package: `a2a.v1`
+- Protocol lock: `v1.0.0`
+- Proto package: `lf.a2a.v1`
 - Implemented transports: `JSONRPC`, `HTTP+JSON`
 - Out of scope: gRPC
 
@@ -36,7 +36,7 @@ Types-only usage:
 
 ```toml
 [dependencies]
-a2a-rust = { version = "0.1", default-features = false }
+a2a-rust = { version = "1", default-features = false }
 ```
 
 ## Quick Start
@@ -45,7 +45,7 @@ Add the crate:
 
 ```toml
 [dependencies]
-a2a-rust = "0.1"
+a2a-rust = "1"
 ```
 
 ### Server
@@ -84,7 +84,7 @@ impl A2AHandler for EchoAgent {
                 },
             ],
             provider: None,
-            version: "0.1.0".to_owned(),
+            version: "1.0.0".to_owned(),
             documentation_url: None,
             capabilities: AgentCapabilities {
                 streaming: Some(false),
@@ -210,7 +210,7 @@ cargo run --example ping_client --features client
 
 - server default endpoint: `POST /rpc`
 - compatibility alias: `POST /jsonrpc`
-- method names use PascalCase v1.0 RC bindings such as `SendMessage`, `GetTask`, and `ListTasks`
+- method names use PascalCase v1.0 bindings such as `SendMessage`, `GetTask`, and `ListTasks`
 
 ### REST
 
@@ -274,8 +274,8 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for contributor workflow details.
 
 ## References
 
-- [A2A Protocol Spec v1.0 RC](https://a2a-protocol.org/latest/specification/)
-- [A2A Proto Source (v1.0.0-rc)](https://github.com/a2aproject/A2A/blob/v1.0.0-rc/specification/a2a.proto)
+- [A2A Protocol Spec v1.0](https://a2a-protocol.org/latest/specification/)
+- [A2A Proto Source (v1.0.0)](https://github.com/a2aproject/A2A/blob/v1.0.0/specification/a2a.proto)
 - [A2A Agent Discovery](https://a2a-protocol.org/latest/topics/agent-discovery/)
 
 ## License

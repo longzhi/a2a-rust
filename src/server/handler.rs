@@ -8,12 +8,11 @@ use futures_core::Stream;
 use crate::A2AError;
 use crate::jsonrpc::PROTOCOL_VERSION;
 use crate::types::{
-    AgentCard, CancelTaskRequest, CreateTaskPushNotificationConfigRequest,
-    DeleteTaskPushNotificationConfigRequest, GetExtendedAgentCardRequest,
-    GetTaskPushNotificationConfigRequest, GetTaskRequest, ListTaskPushNotificationConfigRequest,
-    ListTaskPushNotificationConfigResponse, ListTasksRequest, ListTasksResponse,
-    SendMessageRequest, SendMessageResponse, StreamResponse, SubscribeToTaskRequest, Task,
-    TaskPushNotificationConfig,
+    AgentCard, CancelTaskRequest, DeleteTaskPushNotificationConfigRequest,
+    GetExtendedAgentCardRequest, GetTaskPushNotificationConfigRequest, GetTaskRequest,
+    ListTaskPushNotificationConfigsRequest, ListTaskPushNotificationConfigsResponse,
+    ListTasksRequest, ListTasksResponse, SendMessageRequest, SendMessageResponse, StreamResponse,
+    SubscribeToTaskRequest, Task, TaskPushNotificationConfig,
 };
 
 /// Server-side stream of A2A `StreamResponse` values.
@@ -81,7 +80,7 @@ pub trait A2AHandler: Send + Sync + 'static {
     /// Create or replace a push-notification configuration.
     async fn create_task_push_notification_config(
         &self,
-        _request: CreateTaskPushNotificationConfigRequest,
+        _request: TaskPushNotificationConfig,
     ) -> Result<TaskPushNotificationConfig, A2AError> {
         self.require_push_notifications_capability("CreateTaskPushNotificationConfig")
             .await?;
@@ -103,14 +102,14 @@ pub trait A2AHandler: Send + Sync + 'static {
     }
 
     /// List stored push-notification configurations.
-    async fn list_task_push_notification_config(
+    async fn list_task_push_notification_configs(
         &self,
-        _request: ListTaskPushNotificationConfigRequest,
-    ) -> Result<ListTaskPushNotificationConfigResponse, A2AError> {
-        self.require_push_notifications_capability("ListTaskPushNotificationConfig")
+        _request: ListTaskPushNotificationConfigsRequest,
+    ) -> Result<ListTaskPushNotificationConfigsResponse, A2AError> {
+        self.require_push_notifications_capability("ListTaskPushNotificationConfigs")
             .await?;
         Err(A2AError::UnsupportedOperation(
-            "ListTaskPushNotificationConfig".to_owned(),
+            "ListTaskPushNotificationConfigs".to_owned(),
         ))
     }
 

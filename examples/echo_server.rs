@@ -29,7 +29,7 @@ impl A2AHandler for EchoAgent {
                 },
             ],
             provider: None,
-            version: "0.1.0".to_owned(),
+            version: "1.0.0".to_owned(),
             documentation_url: None,
             capabilities: AgentCapabilities {
                 streaming: Some(false),

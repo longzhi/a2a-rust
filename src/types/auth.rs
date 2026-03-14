@@ -212,7 +212,7 @@ mod tests {
 
         let task = Task {
             id: "task-1".to_owned(),
-            context_id: "ctx-1".to_owned(),
+            context_id: Some("ctx-1".to_owned()),
             status: TaskStatus {
                 state: TaskState::AuthRequired,
                 message: Some(message),
@@ -231,7 +231,7 @@ mod tests {
     fn task_rejects_auth_required_without_metadata() {
         let task = Task {
             id: "task-1".to_owned(),
-            context_id: "ctx-1".to_owned(),
+            context_id: Some("ctx-1".to_owned()),
             status: TaskStatus {
                 state: TaskState::AuthRequired,
                 message: Some(Message {
