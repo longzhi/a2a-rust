@@ -36,7 +36,7 @@ Types-only usage:
 
 ```toml
 [dependencies]
-a2a-rust = { version = "1", default-features = false }
+a2a-rust = { version = "0.1", default-features = false }
 ```
 
 ## Quick Start
@@ -45,7 +45,7 @@ Add the crate:
 
 ```toml
 [dependencies]
-a2a-rust = "1"
+a2a-rust = "0.1"
 ```
 
 ### Server
