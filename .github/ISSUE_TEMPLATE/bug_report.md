@@ -30,7 +30,7 @@ What actually happened instead.
 
 - **OS**: [e.g., macOS 14.0, Ubuntu 22.04]
 - **Rust version**: [e.g., 1.75.0]
-- **a2a-rust version**: [e.g., 0.1.0]
+- **a2a-rust version**: [e.g., 1.0.0]
 - **Features enabled**: [e.g., server, client, both]
 
 ## Code Example

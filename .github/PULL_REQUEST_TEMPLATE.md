@@ -26,7 +26,7 @@
 
 <!-- If this touches types or serialization, confirm protocol compliance -->
 
-- [ ] Changes align with A2A v1.0 RC spec (tag `v1.0.0-rc`)
+- [ ] Changes align with A2A v1.0 spec (tag `v1.0.0`)
 - [ ] Serde serialization matches proto3 JSON mapping
 - [ ] N/A — no protocol-related changes
 

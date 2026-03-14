@@ -13,11 +13,10 @@ use a2a_rust::client::{A2AClient, A2AClientConfig, AgentCardDiscovery, AgentCard
 use a2a_rust::server::{A2AHandler, A2AStream, router};
 use a2a_rust::types::{
     AgentCapabilities, AgentCard, AgentInterface, CancelTaskRequest,
-    CreateTaskPushNotificationConfigRequest, DeleteTaskPushNotificationConfigRequest,
-    GetExtendedAgentCardRequest, GetTaskPushNotificationConfigRequest, GetTaskRequest,
-    ListTaskPushNotificationConfigRequest, ListTaskPushNotificationConfigResponse,
-    ListTasksRequest, ListTasksResponse, Message, Part, PushNotificationConfig, Role,
-    SendMessageRequest, SendMessageResponse, StreamResponse, SubscribeToTaskRequest, Task,
+    DeleteTaskPushNotificationConfigRequest, GetExtendedAgentCardRequest,
+    GetTaskPushNotificationConfigRequest, GetTaskRequest, ListTaskPushNotificationConfigsRequest,
+    ListTaskPushNotificationConfigsResponse, ListTasksRequest, ListTasksResponse, Message, Part,
+    Role, SendMessageRequest, SendMessageResponse, StreamResponse, SubscribeToTaskRequest, Task,
     TaskPushNotificationConfig, TaskState, TaskStatus, TaskStatusUpdateEvent,
 };
 
@@ -111,7 +110,7 @@ impl A2AHandler for ClientTestHandler {
 
         Ok(Task {
             id: request.id,
-            context_id: "ctx-1".to_owned(),
+            context_id: Some("ctx-1".to_owned()),
             status: TaskStatus {
                 state: TaskState::Working,
                 message: None,
@@ -127,7 +126,7 @@ impl A2AHandler for ClientTestHandler {
         Ok(ListTasksResponse {
             tasks: vec![Task {
                 id: "task-1".to_owned(),
-                context_id: "ctx-1".to_owned(),
+                context_id: Some("ctx-1".to_owned()),
                 status: TaskStatus {
                     state: TaskState::Submitted,
                     message: None,
@@ -146,7 +145,7 @@ impl A2AHandler for ClientTestHandler {
     async fn cancel_task(&self, request: CancelTaskRequest) -> Result<Task, A2AError> {
         Ok(Task {
             id: request.id,
-            context_id: "ctx-1".to_owned(),
+            context_id: Some("ctx-1".to_owned()),
             status: TaskStatus {
                 state: TaskState::Canceled,
                 message: None,
@@ -167,7 +166,7 @@ impl A2AHandler for ClientTestHandler {
         Ok(Box::pin(stream::iter(vec![
             StreamResponse::Task(Task {
                 id: request.id.clone(),
-                context_id: "ctx-1".to_owned(),
+                context_id: Some("ctx-1".to_owned()),
                 status: TaskStatus {
                     state: TaskState::Working,
                     message: None,
@@ -192,14 +191,9 @@ impl A2AHandler for ClientTestHandler {
 
     async fn create_task_push_notification_config(
         &self,
-        request: CreateTaskPushNotificationConfigRequest,
+        request: TaskPushNotificationConfig,
     ) -> Result<TaskPushNotificationConfig, A2AError> {
-        Ok(TaskPushNotificationConfig {
-            id: request.config_id.clone(),
-            task_id: request.task_id,
-            push_notification_config: request.config,
-            tenant: request.tenant,
-        })
+        Ok(request)
     }
 
     async fn get_task_push_notification_config(
@@ -209,31 +203,25 @@ impl A2AHandler for ClientTestHandler {
         Ok(TaskPushNotificationConfig {
             id: request.id.clone(),
             task_id: request.task_id,
-            push_notification_config: PushNotificationConfig {
-                id: Some(request.id),
-                url: "https://example.com/push".to_owned(),
-                token: Some("secret".to_owned()),
-                authentication: None,
-            },
             tenant: request.tenant,
+            url: "https://example.com/push".to_owned(),
+            token: Some("secret".to_owned()),
+            authentication: None,
         })
     }
 
-    async fn list_task_push_notification_config(
+    async fn list_task_push_notification_configs(
         &self,
-        request: ListTaskPushNotificationConfigRequest,
-    ) -> Result<ListTaskPushNotificationConfigResponse, A2AError> {
-        Ok(ListTaskPushNotificationConfigResponse {
+        request: ListTaskPushNotificationConfigsRequest,
+    ) -> Result<ListTaskPushNotificationConfigsResponse, A2AError> {
+        Ok(ListTaskPushNotificationConfigsResponse {
             configs: vec![TaskPushNotificationConfig {
                 id: "cfg-1".to_owned(),
                 task_id: request.task_id,
-                push_notification_config: PushNotificationConfig {
-                    id: Some("cfg-1".to_owned()),
-                    url: "https://example.com/push".to_owned(),
-                    token: None,
-                    authentication: None,
-                },
                 tenant: request.tenant,
+                url: "https://example.com/push".to_owned(),
+                token: None,
+                authentication: None,
             }],
             next_page_token: String::new(),
         })
@@ -419,6 +407,7 @@ async fn client_supports_unary_rest_and_jsonrpc_operations() {
         .cancel_task(CancelTaskRequest {
             id: "task-1".to_owned(),
             tenant: None,
+            metadata: None,
         })
         .await
         .expect("cancel should succeed");
@@ -523,16 +512,13 @@ async fn client_supports_push_notification_config_operations() {
     let client = A2AClient::new(&server.base_url).expect("client should build");
 
     let created = client
-        .create_task_push_notification_config(CreateTaskPushNotificationConfigRequest {
+        .create_task_push_notification_config(TaskPushNotificationConfig {
             task_id: "task-1".to_owned(),
-            config_id: "cfg-1".to_owned(),
-            config: PushNotificationConfig {
-                id: Some("cfg-1".to_owned()),
-                url: "https://example.com/push".to_owned(),
-                token: Some("secret".to_owned()),
-                authentication: None,
-            },
+            id: "cfg-1".to_owned(),
             tenant: Some("tenant-a".to_owned()),
+            url: "https://example.com/push".to_owned(),
+            token: Some("secret".to_owned()),
+            authentication: None,
         })
         .await
         .expect("create should succeed");
@@ -545,7 +531,7 @@ async fn client_supports_push_notification_config_operations() {
         .await
         .expect("get should succeed");
     let listed = client
-        .list_task_push_notification_config(ListTaskPushNotificationConfigRequest {
+        .list_task_push_notification_configs(ListTaskPushNotificationConfigsRequest {
             task_id: "task-1".to_owned(),
             page_size: Some(10),
             page_token: None,
@@ -564,10 +550,7 @@ async fn client_supports_push_notification_config_operations() {
 
     assert_eq!(created.id, "cfg-1");
     assert_eq!(created.tenant.as_deref(), Some("tenant-a"));
-    assert_eq!(
-        fetched.push_notification_config.url,
-        "https://example.com/push"
-    );
+    assert_eq!(fetched.url, "https://example.com/push");
     assert_eq!(listed.configs.len(), 1);
 }
 

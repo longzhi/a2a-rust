@@ -10,14 +10,13 @@ use crate::jsonrpc::{
     JSONRPC_VERSION, JsonRpcId, JsonRpcRequest, JsonRpcResponse, METHOD_CANCEL_TASK,
     METHOD_CREATE_TASK_PUSH_NOTIFICATION_CONFIG, METHOD_DELETE_TASK_PUSH_NOTIFICATION_CONFIG,
     METHOD_GET_EXTENDED_AGENT_CARD, METHOD_GET_TASK, METHOD_GET_TASK_PUSH_NOTIFICATION_CONFIG,
-    METHOD_LIST_TASK_PUSH_NOTIFICATION_CONFIG, METHOD_LIST_TASKS, METHOD_SEND_MESSAGE,
+    METHOD_LIST_TASK_PUSH_NOTIFICATION_CONFIGS, METHOD_LIST_TASKS, METHOD_SEND_MESSAGE,
     METHOD_SEND_STREAMING_MESSAGE, METHOD_SUBSCRIBE_TO_TASK,
 };
 use crate::types::{
-    CancelTaskRequest, CreateTaskPushNotificationConfigRequest,
-    DeleteTaskPushNotificationConfigRequest, GetExtendedAgentCardRequest,
-    GetTaskPushNotificationConfigRequest, GetTaskRequest, ListTaskPushNotificationConfigRequest,
-    ListTasksRequest, SendMessageRequest, SubscribeToTaskRequest,
+    CancelTaskRequest, DeleteTaskPushNotificationConfigRequest, GetExtendedAgentCardRequest,
+    GetTaskPushNotificationConfigRequest, GetTaskRequest, ListTaskPushNotificationConfigsRequest,
+    ListTasksRequest, SendMessageRequest, SubscribeToTaskRequest, TaskPushNotificationConfig,
 };
 
 use super::handler::A2AHandler;
@@ -102,7 +101,7 @@ where
                 .await
         }
         METHOD_CREATE_TASK_PUSH_NOTIFICATION_CONFIG => {
-            parse_params::<CreateTaskPushNotificationConfigRequest>(request.params)
+            parse_params::<TaskPushNotificationConfig>(request.params)
                 .and_then_async(|params| handler.create_task_push_notification_config(params))
                 .await
                 .map(serde_json::to_value)
@@ -115,10 +114,10 @@ where
                 .map(serde_json::to_value)
                 .and_then(map_serialization_error)
         }
-        METHOD_LIST_TASK_PUSH_NOTIFICATION_CONFIG => {
-            parse_params::<ListTaskPushNotificationConfigRequest>(request.params)
+        METHOD_LIST_TASK_PUSH_NOTIFICATION_CONFIGS => {
+            parse_params::<ListTaskPushNotificationConfigsRequest>(request.params)
                 .and_then(|params| params.validate().map(|_| params))
-                .and_then_async(|params| handler.list_task_push_notification_config(params))
+                .and_then_async(|params| handler.list_task_push_notification_configs(params))
                 .await
                 .map(serde_json::to_value)
                 .and_then(map_serialization_error)

@@ -35,7 +35,7 @@ Describe specific use cases where this feature would be valuable:
 
 If this relates to an A2A protocol feature, link to the relevant section:
 - Spec: https://a2a-protocol.org/latest/specification/
-- Proto: https://github.com/a2aproject/A2A/blob/v1.0.0-rc/specification/a2a.proto
+- Proto: https://github.com/a2aproject/A2A/blob/v1.0.0/specification/a2a.proto
 
 ## Checklist
 

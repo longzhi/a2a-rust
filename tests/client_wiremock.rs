@@ -444,7 +444,7 @@ fn send_message_response(text: &str, tenant: Option<String>) -> SendMessageRespo
 fn task(id: &str) -> Task {
     Task {
         id: id.to_owned(),
-        context_id: "ctx-1".to_owned(),
+        context_id: Some("ctx-1".to_owned()),
         status: TaskStatus {
             state: TaskState::Working,
             message: None,

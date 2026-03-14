@@ -126,10 +126,10 @@ pub struct ListTasksResponse {
     pub total_size: i32,
 }
 
-/// Paginated response for `ListTaskPushNotificationConfig`.
+/// Paginated response for `ListTaskPushNotificationConfigs`.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ListTaskPushNotificationConfigResponse {
+pub struct ListTaskPushNotificationConfigsResponse {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     /// Returned push-notification configuration page.
     pub configs: Vec<TaskPushNotificationConfig>,
@@ -141,7 +141,7 @@ pub struct ListTaskPushNotificationConfigResponse {
 #[cfg(test)]
 mod tests {
     use super::{
-        ListTaskPushNotificationConfigResponse, SendMessageResponse, StreamResponse,
+        ListTaskPushNotificationConfigsResponse, SendMessageResponse, StreamResponse,
         TaskArtifactUpdateEvent, TaskStatusUpdateEvent,
     };
     use crate::types::{Artifact, Message, Part, Role, Task, TaskState, TaskStatus};
@@ -205,7 +205,7 @@ mod tests {
 
     #[test]
     fn list_push_notification_response_uses_empty_string_for_no_next_page() {
-        let response = ListTaskPushNotificationConfigResponse {
+        let response = ListTaskPushNotificationConfigsResponse {
             configs: Vec::new(),
             next_page_token: String::new(),
         };
@@ -291,7 +291,7 @@ mod tests {
     fn stream_response_round_trip_serialization() {
         let response = StreamResponse::Task(Task {
             id: "task-1".to_owned(),
-            context_id: "ctx-1".to_owned(),
+            context_id: Some("ctx-1".to_owned()),
             status: TaskStatus {
                 state: TaskState::Submitted,
                 message: None,

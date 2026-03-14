@@ -4,7 +4,7 @@ use crate::A2AError;
 use crate::types::JsonObject;
 
 use super::message::Message;
-use super::push::PushNotificationConfig;
+use super::push::TaskPushNotificationConfig;
 use super::task::TaskState;
 
 /// Optional configuration for `SendMessage`.
@@ -15,14 +15,14 @@ pub struct SendMessageConfiguration {
     /// Output modes the caller can accept.
     pub accepted_output_modes: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    /// Optional push configuration to attach to the request.
-    pub push_notification_config: Option<PushNotificationConfig>,
+    /// Optional task push configuration to attach to the request.
+    pub task_push_notification_config: Option<TaskPushNotificationConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     /// Maximum history items requested in task responses.
     pub history_length: Option<i32>,
     #[serde(default, skip_serializing_if = "crate::types::is_false")]
-    /// Whether the server should block for a final response when possible.
-    pub blocking: bool,
+    /// Whether the server should return immediately instead of waiting.
+    pub return_immediately: bool,
 }
 
 /// Request payload for `SendMessage`.
@@ -117,6 +117,9 @@ pub struct CancelTaskRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     /// Optional tenant identifier.
     pub tenant: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Optional request metadata.
+    pub metadata: Option<JsonObject>,
 }
 
 /// Request payload for `GetTaskPushNotificationConfig`.
@@ -145,21 +148,6 @@ pub struct DeleteTaskPushNotificationConfigRequest {
     pub tenant: Option<String>,
 }
 
-/// Request payload for `CreateTaskPushNotificationConfig`.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CreateTaskPushNotificationConfigRequest {
-    /// Owning task identifier.
-    pub task_id: String,
-    /// Desired push configuration identifier.
-    pub config_id: String,
-    /// Push delivery configuration.
-    pub config: PushNotificationConfig,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    /// Optional tenant identifier.
-    pub tenant: Option<String>,
-}
-
 /// Request payload for `SubscribeToTask`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -171,10 +159,10 @@ pub struct SubscribeToTaskRequest {
     pub tenant: Option<String>,
 }
 
-/// Request payload for `ListTaskPushNotificationConfig`.
+/// Request payload for `ListTaskPushNotificationConfigs`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ListTaskPushNotificationConfigRequest {
+pub struct ListTaskPushNotificationConfigsRequest {
     /// Owning task identifier.
     pub task_id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -188,7 +176,7 @@ pub struct ListTaskPushNotificationConfigRequest {
     pub tenant: Option<String>,
 }
 
-impl ListTaskPushNotificationConfigRequest {
+impl ListTaskPushNotificationConfigsRequest {
     /// Validate required identifiers.
     pub fn validate(&self) -> Result<(), A2AError> {
         if self.task_id.is_empty() {
@@ -203,12 +191,12 @@ impl ListTaskPushNotificationConfigRequest {
 
 #[cfg(test)]
 mod tests {
-    use super::{ListTaskPushNotificationConfigRequest, ListTasksRequest, SendMessageRequest};
+    use super::{ListTaskPushNotificationConfigsRequest, ListTasksRequest, SendMessageRequest};
     use crate::types::{Message, Part, Role};
 
     #[test]
-    fn list_task_push_notification_config_request_rejects_empty_task_id() {
-        let request = ListTaskPushNotificationConfigRequest {
+    fn list_task_push_notification_configs_request_rejects_empty_task_id() {
+        let request = ListTaskPushNotificationConfigsRequest {
             task_id: String::new(),
             page_size: None,
             page_token: None,
